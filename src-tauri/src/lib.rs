@@ -71,12 +71,7 @@ pub fn run() {
                 api.prevent_close();
                 let _ = window.hide();
             }
-            tauri::WindowEvent::Focused(false)
-                if window.is_visible().unwrap_or(false) && window.is_minimized().unwrap_or(false) =>
-            {
-                let _ = window.unminimize();
-                let _ = window.show();
-            }
+            tauri::WindowEvent::Focused(false) => platform::raise_if_on_top(window),
             _ => {}
         })
         .invoke_handler(tauri::generate_handler![
