@@ -4,7 +4,7 @@ A small, private clipboard history for the COSMIC desktop. Press Super+V, find w
 
 ## Install
 
-Download `ClipboardX_0.1.0_amd64.deb` from the release build, then:
+Copy `ClipboardX_0.1.0_amd64.deb` to the other computer. Do not compile there. Install takes seconds:
 
 ```bash
 sudo apt install ./ClipboardX_0.1.0_amd64.deb wtype
