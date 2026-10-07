@@ -179,7 +179,7 @@ describe("history interactions", () => {
   it("edits inline, saves with Enter and cancels with Escape", async () => {
     const { user, edit } = setup();
     await user.keyboard("{F2}");
-    const editor = screen.getByRole("textbox", { name: "Edit clipboard text" });
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Edit clipboard text" });
     await waitFor(() => expect(editor.selectionStart).toBe(editor.value.length));
     await user.clear(editor);
     await user.type(editor, "Changed synthetic text");
