@@ -4,6 +4,12 @@ import { describe, it, expect, vi } from "vitest";
 import { useState } from "react";
 import { HistoryWorkspace, type HistoryActions } from "./HistoryWorkspace";
 import type { ClipboardItem } from "../domain/clipboard";
+import App from "../App";
+import { act } from "@testing-library/react";
+
+const native = vi.hoisted(() => ({ invoke: vi.fn(), listen: vi.fn(), callbacks: new Map<string, (event: { payload: unknown }) => void>() }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke: native.invoke, convertFileSrc: (path: string) => `asset:${path}` }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: native.listen }));
 
 const fixtures: ClipboardItem[] = [
   { id: "a", kind: "text", text: "Alpha source code", pinned: true, createdAt: 0, lastUsedAt: null },
@@ -129,5 +135,63 @@ describe("history interactions", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("History unavailable");
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(retry).toHaveBeenCalledOnce();
+  });
+});
+
+describe("native history connection", () => {
+  function configure(rows: { id: string; kind: string; text: string; pinned: boolean }[] = []) {
+    native.callbacks.clear();
+    native.listen.mockImplementation(async (name: string, callback: (event: { payload: unknown }) => void) => {
+      native.callbacks.set(name, callback);
+      return () => native.callbacks.delete(name);
+    });
+    native.invoke.mockReset();
+    native.invoke.mockImplementation(async (command: string) => {
+      if (command === "get_capture_status") return { state: "running" };
+      if (command === "list_history") return rows.map((row) => ({ ...row, createdAt: 0, lastUsedAt: null, thumbnailPath: null, width: null, height: null }));
+    });
+  }
+
+  it("starts empty without sample history and refreshes on native capture", async () => {
+    configure();
+    const view = render(<App />);
+    await screen.findByText("Your clipboard starts here");
+    expect(screen.queryByText(/sample history|Keep the things you copy/)).not.toBeInTheDocument();
+    native.invoke.mockImplementation(async (command: string) => command === "list_history" ? [
+      { id: "native-1", kind: "text", text: "Native synthetic capture", pinned: false, createdAt: 1, lastUsedAt: null },
+    ] : { state: "running" });
+    act(() => native.callbacks.get("history-changed")?.({ payload: null }));
+    await screen.findByRole("button", { name: "Native synthetic capture" });
+    view.unmount();
+    expect(native.callbacks.size).toBe(0);
+  });
+
+  it("edits and pins through real command contracts instead of local preview mutations", async () => {
+    configure([{ id: "native-2", kind: "text", text: "Stored synthetic text", pinned: false }]);
+    render(<App />);
+    await screen.findByRole("button", { name: "Stored synthetic text" });
+    const user = userEvent.setup();
+    await user.keyboard("{Control>}p{/Control}");
+    expect(native.invoke).toHaveBeenCalledWith("set_pinned", { id: "native-2", pinned: true });
+    await user.keyboard("{F2}");
+    await user.clear(screen.getByRole("textbox", { name: "Edit clipboard text" }));
+    await user.type(screen.getByRole("textbox", { name: "Edit clipboard text" }), "Edited synthetic text");
+    await user.keyboard("{Enter}");
+    expect(native.invoke).toHaveBeenCalledWith("edit_text", { id: "native-2", text: "Edited synthetic text" });
+  });
+
+  it("shows structured storage errors and recovers by retrying native history", async () => {
+    configure();
+    native.invoke.mockImplementation(async (command: string) => {
+      if (command === "list_history") throw { code: "storage_error", message: "Could not read clipboard history" };
+      return { state: "running" };
+    });
+    render(<App />);
+    await screen.findByRole("alert");
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not read clipboard history");
+    native.invoke.mockImplementation(async (command: string) => command === "list_history" ? [] : { state: "running" });
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(native.invoke).toHaveBeenCalledWith("retry_capture");
   });
 });

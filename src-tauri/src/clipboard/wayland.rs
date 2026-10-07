@@ -20,7 +20,6 @@ const MAX_TEXT_BYTES: usize = 1024 * 1024;
 const READ_DEADLINE: Duration = Duration::from_secs(2);
 
 fn text_mime(types: &[String]) -> Option<&str> {
-    // Honor clipboard-owner privacy hints, including ClipboardX's own excluded writes.
     if types
         .iter()
         .any(|mime| mime == "application/x-kde-passwordManagerHint")
@@ -82,7 +81,6 @@ pub(super) fn watch(
         match Watcher::new(ClipboardType::Regular, Seat::Unspecified) {
             Ok(mut watcher) => {
                 if let Ok(mut handle) = cancel.lock() { *handle = Some(watcher.cancel_handle()); }
-                // Close the race between stop/retry and registering the cancellation handle.
                 if stop.load(Ordering::Acquire) { break; }
                 if retry.try_recv().is_ok() { continue; }
                 publish_status(&app, &status, CaptureStatus::Running);
@@ -215,7 +213,6 @@ mod tests {
             let _ = wait.recv_timeout(Duration::from_secs(8));
             cancel.cancel();
         });
-        // Discard the initial offer without reading any user's existing clipboard content.
         assert!(watcher.next_event().unwrap().is_some());
         let mut writer = arboard::Clipboard::new().unwrap();
         for fixture in [
@@ -233,7 +230,6 @@ mod tests {
                     let mime = text_mime(&mime_types).expect("UTF-8 text MIME required");
                     let received =
                         read_text(offer.receive(mime).unwrap(), &AtomicBool::new(false)).unwrap();
-                    // Never include received clipboard contents in assertion output.
                     assert!(
                         received == fixture,
                         "Synthetic clipboard text did not round-trip"

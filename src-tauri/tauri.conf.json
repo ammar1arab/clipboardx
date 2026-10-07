@@ -13,8 +13,11 @@
     "windows": [
       {
         "title": "ClipboardX",
-        "width": 800,
-        "height": 600
+        "width": 460,
+        "height": 520,
+        "minWidth": 360,
+        "minHeight": 360,
+        "center": true
       }
     ],
     "security": {

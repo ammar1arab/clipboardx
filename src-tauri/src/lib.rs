@@ -9,11 +9,8 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
-        .plugin(tauri_plugin_sql::Builder::new().build())
-        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let directory = app.path().app_data_dir()?;
             std::fs::create_dir_all(&directory)?;
@@ -38,7 +35,8 @@ pub fn run() {
             commands::get_retention,
             commands::set_retention,
             commands::get_capture_status,
-            commands::retry_capture
+            commands::retry_capture,
+            commands::hide_window
         ])
         .build(tauri::generate_context!());
     match app {

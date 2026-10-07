@@ -24,6 +24,8 @@ This ledger records requirements, not a claim of production readiness.
 - Milestone 1 has a graphite UI shell with typed sample data, local preview actions,
   search, arrow navigation, inline editing, pinning, multi-selection and error states.
   Native paste is visibly unavailable in this preview; it is not a working paste feature.
+  The user's subsequent cleanup request replaces the preview with real persisted history;
+  sample entries and preview mutations have been removed from application code.
 - Eight React Testing Library/user-event interaction tests pass. Frontend build and
   Rust fmt/check/Clippy (warnings denied)/tests pass on 2026-10-07.
 - Vite runs at `127.0.0.1:1420`. Computer control reports no browser/native app surfaces;
@@ -49,8 +51,25 @@ This ledger records requirements, not a claim of production readiness.
   -- --ignored --test-threads=1`: passed on the current COSMIC Wayland session. It verifies
   short English, mixed Arabic/English multiline text, URL offers and watcher cancellation.
   This verifies native event transfer, not copying from named applications or popup paste.
-- Images, live history integration, native paste, launcher, settings,
+- Images, native paste, launcher, settings,
   autostart state, release packaging and hardening remain outstanding.
+
+## Current cleanup and live integration
+
+The window now reads real SQLite history through native commands and listens for capture
+events, with debounced refreshes, structured error display and retry. Edit, deletion and
+pinning use Rust persistence. Native paste remains explicitly unavailable until milestone 7.
+Eleven frontend tests verify the shell and live command/event integration. This connection
+was brought forward at the user's request to remove dummy text.
+
+Popup dimensions are configured at 460 × 520, minimum 360 × 360. Source comments, starter
+logos and greeting code are removed. Unused SQL/store/opener plugins, their permissions and
+six frontend dependencies are removed. One capability file grants event subscriptions and
+official autostart operations. The remaining separate modules own meaningful concerns.
+
+Tauri development startup was exercised, and its process handle remained live until stopped
+for rebuild. Frontend hot reload produced IPC fallback/callback warnings; clean-start
+behavior still needs verification. Window size and visuals are not claimed as observed.
 
 ## Required automated gates
 

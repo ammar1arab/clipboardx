@@ -201,7 +201,6 @@ impl History {
         }
         let mut transaction = self.pool.begin().await.map_err(database_error)?;
         for id in ids {
-            // Deletion is idempotent if retention or a prior request already removed an item.
             sqlx::query("DELETE FROM clipboard_items WHERE id = ?")
                 .bind(id)
                 .execute(&mut *transaction)

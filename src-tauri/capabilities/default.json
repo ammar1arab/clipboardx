@@ -6,8 +6,10 @@
     "main"
   ],
   "permissions": [
-    "core:default",
-    "opener:default",
-    "sql:default"
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled"
   ]
 }

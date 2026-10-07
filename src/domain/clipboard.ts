@@ -17,6 +17,5 @@ export function filterItems(items: ClipboardItem[], query: string): ClipboardIte
 }
 
 export function selectedItems(items: ClipboardItem[], selected: Set<string>): ClipboardItem[] {
-  // Paste in history order, independent of click order.
   return items.filter((item) => selected.has(item.id));
 }

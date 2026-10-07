@@ -5,12 +5,8 @@ description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-# The `_lib` suffix may seem redundant but it is necessary
-# to make the lib name unique and wouldn't conflict with the bin name.
-# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "clipboardx_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
@@ -19,12 +15,9 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite"], default-features = false }
-tauri-plugin-store = "2"
-tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 arboard = { version = "3.6.1", features = ["wayland-data-control"] }
 sha2 = "0.11.0"
 hex = "0.4.3"
@@ -32,7 +25,6 @@ uuid = { version = "1.27.0", features = ["v4", "serde"] }
 chrono = { version = "0.4.45", features = ["serde"] }
 
 
-# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
 codegen-units = 1
 lto = true

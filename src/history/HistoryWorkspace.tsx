@@ -11,9 +11,9 @@ export type HistoryActions = {
   edit: (id: string, text: string) => Promise<void>;
   dismiss: () => void;
 };
-type Props = { items: ClipboardItem[]; actions: HistoryActions; loading?: boolean; error?: string; retry?: () => void; preview?: boolean };
+type Props = { items: ClipboardItem[]; actions: HistoryActions; loading?: boolean; error?: string; retry?: () => void };
 
-export function HistoryWorkspace({ items, actions, loading, error, retry, preview }: Props) {
+export function HistoryWorkspace({ items, actions, loading, error, retry }: Props) {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
@@ -80,7 +80,6 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, previe
         onChange={(event) => { setQuery(event.target.value); selection.clear(); }} />
       {query && <button className="icon-button" aria-label="Clear search" onClick={() => { setQuery(""); search.current?.focus(); }}><X size={15} /></button>}
     </div>
-    {preview && <div className="preview-notice">Interface preview · sample history · native actions are not connected</div>}
     {(error || operationError) && <div className="error-message" role="alert">{error || operationError}{retry && <button onClick={retry}>Retry</button>}</div>}
     {selection.selected.size > 0 && <div className="selection-toolbar" aria-label="Selection actions">
       <span aria-live="polite">{selection.selected.size} selected</span>

@@ -74,3 +74,11 @@ pub fn get_capture_status(
 pub fn retry_capture(monitor: tauri::State<'_, crate::clipboard::CaptureMonitor>) {
     monitor.retry();
 }
+
+#[tauri::command]
+pub fn hide_window(window: tauri::WebviewWindow) -> Result<(), AppError> {
+    window.hide().map_err(|_| AppError {
+        code: "window_error",
+        message: "Could not hide ClipboardX. Try again.".into(),
+    })
+}

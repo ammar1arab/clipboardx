@@ -33,7 +33,6 @@ pub(super) fn publish_status(app: &AppHandle, status: &Mutex<CaptureStatus>, nex
     if let Ok(mut current) = status.lock() {
         if *current != next {
             *current = next.clone();
-            // The current status remains available through get_capture_status if delivery fails.
             let _ = app.emit("capture-status", next);
         }
     }
