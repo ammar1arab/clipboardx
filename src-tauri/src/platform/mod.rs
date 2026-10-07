@@ -22,7 +22,7 @@ impl WindowFrame {
 pub fn apply_saved_size(app: &AppHandle, window: &tauri::WebviewWindow) {
     let (width, height) = app.state::<WindowFrame>().get();
     let _ = window.unmaximize();
-    let _ = window.set_size(tauri::LogicalSize::new(width, height));
+    let _ = window.set_size(tauri::LogicalSize::new(width as f64, height as f64));
 }
 
 pub fn toggle(app: &AppHandle) -> Result<(), AppError> {
