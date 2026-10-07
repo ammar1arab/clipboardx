@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Clipboard, Search, X, ArrowUpRight, Trash2, Settings } from "lucide-react";
+import { flushSync } from "react-dom";
+import { Clipboard, X, ArrowUpRight, Trash2, Settings } from "lucide-react";
 import { filterItems, selectedItems, type ClipboardItem } from "../domain/clipboard";
 import { useSelection } from "./useSelection";
 import { HistoryItemRow } from "./HistoryItemRow";
@@ -21,7 +22,9 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
   const [busy, setBusy] = useState(false);
   const [staging, setStaging] = useState(false);
   const [stageReady, setStageReady] = useState(false);
+  const operationRunning = useRef(false);
   const search = useRef<HTMLInputElement>(null);
+  const workspace = useRef<HTMLElement>(null);
   const visible = useMemo(() => filterItems(items, query), [items, query]);
   const selection = useSelection(visible.map((item) => item.id));
   const active = visible.find((item) => item.id === selection.activeId);
@@ -29,7 +32,7 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
   const stageQueue = useRef(Promise.resolve());
   const stage = useRef(actions.stage);
   stage.current = actions.stage;
-  useEffect(() => { search.current?.focus(); search.current?.select(); }, [launchCount]);
+  useEffect(() => { workspace.current?.focus(); }, [launchCount]);
   useEffect(() => {
     const ids: string[] = JSON.parse(selectedKey);
     if (!ids.length) { setStaging(false); setStageReady(false); return; }
@@ -44,11 +47,12 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
   }, [selectedKey]);
 
   async function run(operation: () => Promise<void>) {
-    if (busy) return;
+    if (operationRunning.current) return;
+    operationRunning.current = true;
     setBusy(true); setOperationError(null);
     try { await operation(); }
     catch (failure) { setOperationError(typeof failure === "string" ? failure : "The action failed. Please try again."); }
-    finally { setBusy(false); }
+    finally { operationRunning.current = false; setBusy(false); }
   }
   function beginEdit(item: ClipboardItem) { if (item.kind === "text") setEditing({ id: item.id, text: item.text }); }
   function removeSelected() {
@@ -64,7 +68,7 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
     void run(() => actions.paste(entries));
   }
   function saveEdit() {
-    if (editing) void run(async () => { await actions.edit(editing.id, editing.text); setEditing(null); search.current?.focus(); });
+    if (editing) void run(async () => { await actions.edit(editing.id, editing.text); flushSync(() => setEditing(null)); workspace.current?.focus(); });
   }
   function onKeyDown(event: KeyboardEvent<HTMLElement>) {
     if (editing) return;
@@ -75,12 +79,15 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
     if (event.key === "Escape") {
       event.preventDefault();
       if (selection.selected.size) selection.clear(); else if (query) setQuery(""); else actions.dismiss();
-      search.current?.focus(); return;
+      return;
+    }
+    if (event.key.length === 1 && event.key !== " " && !modifier && !event.altKey && !target.closest("input, textarea, select")) {
+      event.preventDefault(); setQuery(query + event.key); selection.clear(); search.current?.focus(); return;
     }
     if (inControl && !(modifier && ["a", "p", "enter"].includes(event.key.toLowerCase())) && !["Delete", "ArrowDown", "ArrowUp", "F2"].includes(event.key)) return;
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault(); selection.move(event.key === "ArrowDown" ? 1 : -1, event.shiftKey);
-      search.current?.focus();
+      if (!inSearch) workspace.current?.focus();
     } else if (modifier && event.key.toLowerCase() === "a") {
       event.preventDefault(); selection.selectAll();
     } else if (event.key === "Enter") {
@@ -93,14 +100,13 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
       event.preventDefault(); void run(() => actions.pin(active.id, !active.pinned));
     }
   }
-  return <main className="workspace" onKeyDown={onKeyDown} aria-busy={busy || loading}>
-    <header className="titlebar"><span className="brand"><Clipboard size={17} aria-hidden="true" /> ClipboardX</span>{openSettings ? <button className="icon-button" aria-label="Open settings" onClick={openSettings}><Settings size={16} /></button> : <span className="privacy-label">Local history</span>}</header>
-    <div className="searchbar"><Search size={17} aria-hidden="true" />
-      <input ref={search} autoFocus aria-label="Search clipboard history" placeholder="Search your clipboard…" value={query}
+  return <main ref={workspace} tabIndex={-1} className="workspace" onKeyDown={onKeyDown} aria-busy={busy || loading}>
+    <header className="titlebar"><div className="searchbar">
+      <input ref={search} aria-label="Search clipboard history" placeholder="Search your clipboard…" value={query}
         aria-controls="history-list" aria-activedescendant={selection.activeId ? `entry-${selection.activeId}` : undefined}
         onChange={(event) => { setQuery(event.target.value); selection.clear(); }} />
-      {query && <button className="icon-button" aria-label="Clear search" onClick={() => { setQuery(""); search.current?.focus(); }}><X size={15} /></button>}
-    </div>
+      {query && <button className="icon-button" aria-label="Clear search" onClick={() => { setQuery(""); search.current?.focus(); }}><X size={14} /></button>}
+    </div>{openSettings && <button className="icon-button" aria-label="Open settings" onClick={openSettings}><Settings size={16} /></button>}</header>
     {(error || operationError) && <div className="error-message" role="alert">{error || operationError}{retry && <button onClick={retry}>Retry</button>}</div>}
     {selection.selected.size > 0 && <div className="selection-toolbar" aria-label="Selection actions">
       <span aria-live="polite">{selection.selected.size} selected{staging ? " · Copying…" : stageReady ? " · Ctrl+V anywhere" : ""}</span>
@@ -113,13 +119,13 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
         <div className="empty-state"><Clipboard size={28} aria-hidden="true" /><strong>{query ? "No matching entries" : "Your clipboard starts here"}</strong><span>{query ? "Try another word or clear your search." : "Copy text or an image to keep it nearby."}</span></div> :
         <ul id="history-list" aria-label="Clipboard history" className="history-list">
           {visible.map((item) => editing?.id === item.id ? <li key={item.id} className="inline-editor">
-            <label htmlFor="edit-text">Edit clipboard text</label>
-            <textarea id="edit-text" autoFocus dir="auto" value={editing.text} onChange={(event) => setEditing({ ...editing, text: event.target.value })}
+            <label className="editor-label" htmlFor="edit-text">Edit</label>
+            <textarea id="edit-text" autoFocus dir="auto" aria-label="Edit clipboard text" value={editing.text} onChange={(event) => setEditing({ ...editing, text: event.target.value })}
               onKeyDown={(event) => {
-                if (event.key === "Escape") { event.preventDefault(); setEditing(null); search.current?.focus(); }
+                if (event.key === "Escape") { event.preventDefault(); flushSync(() => setEditing(null)); workspace.current?.focus(); }
                 else if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); saveEdit(); }
               }} />
-            <div className="editor-actions"><span>Shift+Enter for a new line</span><button onClick={() => { setEditing(null); search.current?.focus(); }}>Cancel</button><button disabled={busy || !editing.text} onClick={saveEdit}>Save</button></div>
+            <div className="editor-actions"><span>Shift+Enter for a new line</span><button onClick={() => { flushSync(() => setEditing(null)); workspace.current?.focus(); }}>Cancel</button><button disabled={busy || !editing.text} onClick={saveEdit}>Save</button></div>
           </li> : <HistoryItemRow key={item.id} item={item} active={selection.activeId === item.id} selected={selection.selected.has(item.id)}
             activate={() => selection.activate(item.id)}
             choose={(toggle, range) => selection.choose(item.id, toggle, range)} paste={() => void run(() => actions.paste([item]))}

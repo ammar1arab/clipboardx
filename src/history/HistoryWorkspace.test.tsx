@@ -15,7 +15,7 @@ const fixtures: ClipboardItem[] = [
   { id: "a", kind: "text", text: "Alpha source code", pinned: true, createdAt: 0, lastUsedAt: null },
   { id: "b", kind: "text", text: "Beta https://example.test", pinned: false, createdAt: 0, lastUsedAt: null },
   { id: "c", kind: "text", text: "مرحباً English", pinned: false, createdAt: 0, lastUsedAt: null },
-  { id: "d", kind: "image", thumbnailUrl: "/synthetic.png", width: 400, height: 200, pinned: false, createdAt: 0, lastUsedAt: null },
+  { id: "d", kind: "image", thumbnailUrl: "/synthetic.png", filePath: "/tmp/synthetic.png", width: 400, height: 200, pinned: false, createdAt: 0, lastUsedAt: null },
 ];
 
 function setup() {
@@ -23,6 +23,7 @@ function setup() {
   const dismiss = vi.fn();
   const edit = vi.fn();
   const stage = vi.fn().mockResolvedValue(undefined);
+  const openSettings = vi.fn();
   function Harness() {
     const [items, setItems] = useState(fixtures);
     const actions: HistoryActions = {
@@ -34,11 +35,12 @@ function setup() {
         setItems((current) => current.map((item) => item.id === id && item.kind === "text" ? { ...item, text } : item));
       },
     };
-    return <HistoryWorkspace items={items} actions={actions} />;
+    return <HistoryWorkspace items={items} actions={actions} openSettings={openSettings} />;
   }
   render(<Harness />);
-  return { user: userEvent.setup(), paste, dismiss, edit, stage };
+  return { user: userEvent.setup(), paste, dismiss, edit, stage, openSettings };
 }
+const menuFor = (name: string) => within(screen.getByRole("button", { name }).closest("li")!).getByRole("button", { name: "More actions" });
 
 describe("history interactions", () => {
   it("stages the full selection for external Ctrl+V and deletes a filtered selection", async () => {
@@ -61,11 +63,13 @@ describe("history interactions", () => {
     expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "مرحباً English");
     expect(dataTransfer.effectAllowed).toBe("copy");
     expect(paste).not.toHaveBeenCalled();
+    fireEvent.dragStart(screen.getByRole("button", { name: "Image, 400 by 200" }), { dataTransfer });
+    expect(dataTransfer.setData).toHaveBeenCalledWith("text/uri-list", "file:///tmp/synthetic.png");
   });
 
-  it("focuses search, navigates with boundaries and pastes the active item", async () => {
+  it("focuses the workspace, navigates with boundaries and pastes the active item", async () => {
     const { user, paste } = setup();
-    expect(screen.getByRole("textbox", { name: "Search clipboard history" })).toHaveFocus();
+    expect(screen.getByRole("main")).toHaveFocus();
     await user.keyboard("{ArrowUp}{Enter}");
     expect(paste.mock.calls[0][0][0].id).toBe("a");
     await user.keyboard("{ArrowDown}{Enter}");
@@ -85,6 +89,34 @@ describe("history interactions", () => {
     expect(screen.getByText("No matching entries")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Clear search" }));
     expect(screen.getAllByRole("listitem")).toHaveLength(4);
+  });
+
+  it("does not autofocus search and sends typed characters into it", async () => {
+    const { user } = setup();
+    const search = screen.getByRole("textbox", { name: "Search clipboard history" });
+    expect(search).not.toHaveFocus();
+    await user.keyboard("Be");
+    expect(search).toHaveFocus();
+    expect(search).toHaveValue("Be");
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+  });
+
+  it("opens settings from the toolbar gear", async () => {
+    const { user, openSettings } = setup();
+    await user.click(screen.getByRole("button", { name: "Open settings" }));
+    expect(openSettings).toHaveBeenCalledOnce();
+  });
+
+  it("pins and deletes through the row menu without pasting", async () => {
+    const { user, paste } = setup();
+    await user.click(menuFor("Beta https://example.test"));
+    await user.click(screen.getByRole("menuitem", { name: "Pin" }));
+    expect(screen.getAllByText("Pinned")).toHaveLength(2);
+    await user.click(menuFor("Beta https://example.test"));
+    await user.click(screen.getByRole("menuitem", { name: "Delete" }));
+    expect(screen.queryByRole("button", { name: "Beta https://example.test" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(paste).not.toHaveBeenCalled();
   });
 
   it("supports Ctrl+Click, range selection and deterministic multi-paste", async () => {
@@ -131,7 +163,7 @@ describe("history interactions", () => {
     await user.type(editor, "Changed synthetic text");
     await user.keyboard("{Enter}");
     expect(edit).toHaveBeenCalledWith("a", "Changed synthetic text");
-    expect(screen.getByRole("textbox", { name: "Search clipboard history" })).toHaveFocus();
+    expect(screen.getByRole("main")).toHaveFocus();
     await user.keyboard("{F2}");
     await user.type(screen.getByRole("textbox", { name: "Edit clipboard text" }), " cancelled");
     await user.keyboard("{Escape}");
@@ -141,8 +173,12 @@ describe("history interactions", () => {
 
   it("does not offer text editing for images and dismisses with Escape", async () => {
     const { user, dismiss } = setup();
-    const imageRow = screen.getByRole("button", { name: "Image, 400 by 200" }).closest("li")!;
-    expect(within(imageRow).queryByRole("button", { name: "Edit item" })).not.toBeInTheDocument();
+    await user.click(menuFor("Image, 400 by 200"));
+    expect(screen.getByRole("menuitem", { name: "Delete" })).toBeVisible();
+    expect(screen.queryByRole("menuitem", { name: "Edit" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(dismiss).not.toHaveBeenCalled();
     await user.keyboard("{ArrowDown}{ArrowDown}{ArrowDown}{F2}");
     expect(screen.queryByRole("textbox", { name: "Edit clipboard text" })).not.toBeInTheDocument();
     await user.keyboard("{Escape}");

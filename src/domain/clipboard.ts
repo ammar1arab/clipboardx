@@ -5,7 +5,7 @@ export type ClipboardItem = {
   lastUsedAt: number | null;
 } & (
   | { kind: "text"; text: string }
-  | { kind: "image"; thumbnailUrl: string; width: number; height: number }
+  | { kind: "image"; thumbnailUrl: string; filePath: string; width: number; height: number }
 );
 
 export function filterItems(items: ClipboardItem[], query: string): ClipboardItem[] {

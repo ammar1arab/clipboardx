@@ -7,12 +7,26 @@ const { invoke, enable, disable, isEnabled } = vi.hoisted(() => ({ invoke: vi.fn
 vi.mock("@tauri-apps/api/core", () => ({ invoke, convertFileSrc: vi.fn() }));
 vi.mock("@tauri-apps/plugin-autostart", () => ({ enable, disable, isEnabled }));
 
+test("shows load errors with a working Retry instead of loading forever", async () => {
+  invoke.mockReset();
+  invoke.mockRejectedValueOnce("Command get_settings not found").mockImplementation(async (command) => command === "get_settings" ? { captureImages: true, pasteSeparator: "\n" } : { maxItems: 500, maxAgeDays: 30 });
+  isEnabled.mockResolvedValue(false);
+  const user = userEvent.setup();
+  render(<Settings close={vi.fn()} />);
+  expect(await screen.findByRole("alert")).toHaveTextContent("Command get_settings not found");
+  expect(screen.queryByText("Loading settings…")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Retry" }));
+  expect(await screen.findByLabelText("Paste separator")).toBeVisible();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(invoke.mock.calls.filter(([command]) => command === "get_settings")).toHaveLength(2);
+});
+
 test("loads real preferences, saves separator and requires confirmation before deleting pins", async () => {
   invoke.mockImplementation(async (command) => command === "get_settings" ? { captureImages: true, pasteSeparator: " | " } : command === "get_retention" ? { maxItems: 500, maxAgeDays: 30 } : undefined);
   isEnabled.mockResolvedValue(true);
   const user = userEvent.setup();
   render(<Settings close={vi.fn()} />);
-  const separator = await screen.findByLabelText("Multi-paste separator");
+  const separator = await screen.findByLabelText("Paste separator");
   expect(screen.getByLabelText("Start at login")).toBeChecked();
   await user.clear(separator); await user.type(separator, ", ");
   await user.click(screen.getByRole("button", { name: "Save settings" }));

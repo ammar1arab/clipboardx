@@ -19,6 +19,26 @@ use wl_clipboard_rs::{
 const MAX_TEXT_BYTES: usize = 1024 * 1024;
 const READ_DEADLINE: Duration = Duration::from_secs(2);
 
+fn image_mime<'a>(types: &'a [String]) -> Option<&'a str> {
+    [
+        "image/png",
+        "image/x-png",
+        "image/jpeg",
+        "image/jpg",
+        "image/webp",
+        "image/bmp",
+        "image/x-bmp",
+        "image/tiff",
+    ]
+    .into_iter()
+    .find_map(|candidate| {
+        types
+            .iter()
+            .find(|mime| mime.as_str() == candidate)
+            .map(String::as_str)
+    })
+}
+
 fn text_mime(types: &[String]) -> Option<&str> {
     if types
         .iter()
@@ -40,8 +60,10 @@ fn read_bytes(
     mut reader: impl Read + AsFd,
     stop: &AtomicBool,
     limit: usize,
+    deadline: Duration,
 ) -> Result<Vec<u8>, &'static str> {
-    let deadline = Instant::now() + READ_DEADLINE;
+    let deadline = Instant::now() + deadline;
+    let image = limit > MAX_TEXT_BYTES;
     let mut contents = Vec::new();
     let mut buffer = [0u8; 8192];
     loop {
@@ -49,7 +71,11 @@ fn read_bytes(
             return Err("Capture stopped");
         }
         if Instant::now() >= deadline {
-            return Err("Clipboard owner did not finish sending text. Copy again to retry.");
+            return Err(if image {
+                "Clipboard image did not finish sending. Copy again."
+            } else {
+                "Clipboard owner did not finish sending text. Copy again to retry."
+            });
         }
         let ready = {
             let mut descriptors = [PollFd::new(reader.as_fd(), PollFlags::POLLIN)];
@@ -67,7 +93,11 @@ fn read_bytes(
             break;
         }
         if contents.len() + length > limit {
-            return Err("Clipboard text exceeds the 1 MiB capture limit.");
+            return Err(if image {
+                "Clipboard image exceeds the 64 MiB limit."
+            } else {
+                "Clipboard text exceeds the 1 MiB capture limit."
+            });
         }
         contents.extend_from_slice(&buffer[..length]);
     }
@@ -76,7 +106,7 @@ fn read_bytes(
 
 #[cfg(test)]
 fn read_text(reader: impl Read + AsFd, stop: &AtomicBool) -> Result<String, &'static str> {
-    String::from_utf8(read_bytes(reader, stop, MAX_TEXT_BYTES)?)
+    String::from_utf8(read_bytes(reader, stop, MAX_TEXT_BYTES, READ_DEADLINE)?)
         .map_err(|_| "Clipboard text is not valid UTF-8.")
 }
 
@@ -104,10 +134,10 @@ pub(super) fn watch(
                                 Ok(settings) => settings.capture_images,
                                 Err(_) => { publish_status(&app, &status, CaptureStatus::Error { message: "Could not read capture settings. Retry." }); continue; }
                             };
-                            let image_mime = if capture_images { ["image/png", "image/jpeg", "image/bmp", "image/tiff"].into_iter().find(|mime| mime_types.iter().any(|candidate| candidate == mime)) } else { None };
+                            let image_mime = if capture_images { image_mime(&mime_types) } else { None };
                             let Some(mime) = image_mime.or_else(|| text_mime(&mime_types)) else { continue; };
                             let result = offer.receive(mime).map_err(|_| "Could not receive clipboard contents. Copy again.")
-                                .and_then(|reader| read_bytes(reader, &stop, if image_mime.is_some() { 64 * 1024 * 1024 } else { MAX_TEXT_BYTES }));
+                                .and_then(|reader| read_bytes(reader, &stop, if image_mime.is_some() { 64 * 1024 * 1024 } else { MAX_TEXT_BYTES }, if image_mime.is_some() { Duration::from_secs(8) } else { READ_DEADLINE }));
                             let saved = match result {
                                 Ok(bytes) if image_mime.is_some() => tauri::async_runtime::block_on(history.capture_image(bytes)).map_err(|_| "Could not save image. Check image limits and storage."),
                                 Ok(bytes) => match String::from_utf8(bytes) {
@@ -174,6 +204,11 @@ mod tests {
             None
         );
         assert_eq!(text_mime(&["image/png".into()]), None);
+        assert_eq!(
+            image_mime(&["image/webp".into(), "text/plain".into()]),
+            Some("image/webp")
+        );
+        assert_eq!(image_mime(&["text/plain".into()]), None);
     }
 
     #[test]

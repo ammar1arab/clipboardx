@@ -87,3 +87,42 @@ impl NativeClipboard {
         }
     }
 }
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use super::*;
+    #[test]
+    #[ignore = "requires live Wayland; replaces clipboard with a synthetic image and text"]
+    fn live_native_selection_writes_images_and_text() {
+        tauri::async_runtime::block_on(async {
+            let root =
+                std::env::temp_dir().join(format!("clipboardx-native-{}", uuid::Uuid::new_v4()));
+            std::fs::create_dir(&root).unwrap();
+            let history = crate::database::History::open(&root.join("history.sqlite"))
+                .await
+                .unwrap();
+            let mut bytes = std::io::Cursor::new(Vec::new());
+            image::DynamicImage::new_rgba8(12, 8)
+                .write_to(&mut bytes, image::ImageFormat::Png)
+                .unwrap();
+            history.capture_image(bytes.into_inner()).await.unwrap();
+            let writer = NativeClipboard::default();
+            let image_id = history.list().await.unwrap()[0].id.clone();
+            writer.write_selection(&history, &[image_id]).await.unwrap();
+            let mut reader = arboard::Clipboard::new().unwrap();
+            let image = reader.get_image().unwrap();
+            assert_eq!((image.width, image.height), (12, 8));
+            history
+                .capture_text("ClipboardX synthetic native test")
+                .await
+                .unwrap();
+            let text_id = history.list().await.unwrap()[0].id.clone();
+            writer.write_selection(&history, &[text_id]).await.unwrap();
+            assert!(reader.get_text().unwrap() == "ClipboardX synthetic native test");
+            writer.close();
+            drop(reader);
+            drop(history);
+            std::fs::remove_dir_all(root).unwrap();
+        });
+    }
+}

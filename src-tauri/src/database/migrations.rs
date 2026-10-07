@@ -16,7 +16,7 @@ pub(super) async fn run(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             .fetch_one(&mut *transaction)
             .await?
             .get("version");
-    if current > MIGRATIONS.last().unwrap().0 {
+    if current > MIGRATIONS.last().map_or(0, |migration| migration.0) {
         return Err(sqlx::Error::Protocol(
             "Database was created by a newer ClipboardX version".into(),
         ));
