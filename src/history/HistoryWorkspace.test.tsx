@@ -180,6 +180,7 @@ describe("history interactions", () => {
     const { user, edit } = setup();
     await user.keyboard("{F2}");
     const editor = screen.getByRole("textbox", { name: "Edit clipboard text" });
+    await waitFor(() => expect(editor.selectionStart).toBe(editor.value.length));
     await user.clear(editor);
     await user.type(editor, "Changed synthetic text");
     await user.keyboard("{Enter}");

@@ -125,6 +125,13 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
           {visible.map((item) => editing?.id === item.id ? <li key={item.id} className="inline-editor">
             <label className="editor-label" htmlFor="edit-text">Edit</label>
             <textarea id="edit-text" autoFocus dir="auto" aria-label="Edit clipboard text" value={editing.text} onChange={(event) => setEditing({ ...editing, text: event.target.value })}
+              onFocus={(event) => {
+                const field = event.currentTarget;
+                if (field.dataset.caret === "end") return;
+                field.dataset.caret = "end";
+                const end = field.value.length;
+                queueMicrotask(() => { field.setSelectionRange(end, end); field.scrollTop = field.scrollHeight; });
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Escape") { event.preventDefault(); flushSync(() => setEditing(null)); workspace.current?.focus(); }
                 else if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); saveEdit(); }
