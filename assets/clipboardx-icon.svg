@@ -1,0 +1,66 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="170" y1="120" x2="850" y2="910"
+                    gradientUnits="userSpaceOnUse">
+      <stop stop-color="#25272D"/>
+      <stop offset="1" stop-color="#101114"/>
+    </linearGradient>
+
+    <linearGradient id="front" x1="350" y1="280" x2="690" y2="760"
+                    gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#D8DAE2"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="32" stdDeviation="34"
+                    flood-color="#000000" flood-opacity=".34"/>
+    </filter>
+  </defs>
+
+  <!-- App squircle -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#16181E"/>
+  <rect x="72" y="72" width="880" height="880" rx="224" fill="url(#bg)"/>
+
+  <!-- Rear clipboard card -->
+  <g transform="rotate(-9 512 520)" opacity=".42">
+    <rect x="285" y="248" width="454" height="545" rx="92"
+          fill="#8D93A3"/>
+  </g>
+
+  <!-- Middle clipboard card -->
+  <g transform="rotate(7 512 520)" opacity=".72">
+    <rect x="300" y="230" width="454" height="545" rx="92"
+          fill="#B7BBC7"/>
+  </g>
+
+  <!-- Front card -->
+  <g filter="url(#shadow)">
+    <rect x="292" y="220" width="440" height="568" rx="96"
+          fill="url(#front)"/>
+
+    <!-- Clipboard tab -->
+    <rect x="414" y="183" width="196" height="110" rx="50"
+          fill="#FFFFFF"/>
+
+    <rect x="463" y="215" width="98" height="24" rx="12"
+          fill="#25272D" opacity=".22"/>
+
+    <!-- Text lines -->
+    <rect x="370" y="358" width="278" height="31" rx="15.5"
+          fill="#24262C" opacity=".17"/>
+    <rect x="370" y="426" width="216" height="31" rx="15.5"
+          fill="#24262C" opacity=".17"/>
+    <rect x="370" y="494" width="250" height="31" rx="15.5"
+          fill="#24262C" opacity=".17"/>
+
+    <!-- ClipboardX mark -->
+    <path d="M431 620 L512 701 M593 620 L512 701
+             M512 620 L431 701 M512 620 L593 701"
+          stroke="#212329"
+          stroke-width="38"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+  </g>
+</svg>

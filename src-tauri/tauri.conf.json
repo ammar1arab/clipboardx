@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "clipboardx",
+  "productName": "ClipboardX",
   "version": "0.1.0",
   "identifier": "com.ammararab.clipboardx",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "clipboardx",
+        "title": "ClipboardX",
         "width": 800,
         "height": 600
       }
