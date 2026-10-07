@@ -25,29 +25,8 @@ pub fn apply_saved_size(app: &AppHandle, window: &tauri::WebviewWindow) {
     let _ = window.set_size(tauri::LogicalSize::new(width as f64, height as f64));
 }
 
-static ON_TOP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-static RAISING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
 pub fn apply_on_top(_app: &AppHandle, window: &tauri::WebviewWindow, on_top: bool) {
-    ON_TOP.store(on_top, std::sync::atomic::Ordering::Relaxed);
     let _ = window.set_always_on_top(on_top);
-    if on_top {
-        let _ = window.show();
-    }
-}
-
-pub fn raise_if_on_top(window: &tauri::Window) {
-    if !ON_TOP.load(std::sync::atomic::Ordering::Relaxed) || !window.is_visible().unwrap_or(false) {
-        return;
-    }
-    if RAISING.swap(true, std::sync::atomic::Ordering::SeqCst) {
-        return;
-    }
-    let _ = window.unminimize();
-    let _ = window.show();
-    let _ = window.set_always_on_top(true);
-    let _ = window.set_focus();
-    RAISING.store(false, std::sync::atomic::Ordering::SeqCst);
 }
 
 pub fn toggle(app: &AppHandle) -> Result<(), AppError> {
