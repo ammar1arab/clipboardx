@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { flushSync } from "react-dom";
-import { Clipboard, X, ArrowUpRight, Trash2, Settings } from "lucide-react";
+import { Clipboard, X, ArrowUpRight, Trash2, Settings, Image, Type } from "lucide-react";
 import { filterItems, selectedItems, type ClipboardItem } from "../domain/clipboard";
 import { useSelection } from "./useSelection";
 import { HistoryItemRow } from "./HistoryItemRow";
@@ -17,6 +17,7 @@ type Props = { items: ClipboardItem[]; actions: HistoryActions; loading?: boolea
 
 export function HistoryWorkspace({ items, actions, loading, error, retry, launchCount, openSettings }: Props) {
   const [query, setQuery] = useState("");
+  const [kind, setKind] = useState<"text" | "image" | null>(null);
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -25,7 +26,7 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
   const operationRunning = useRef(false);
   const search = useRef<HTMLInputElement>(null);
   const workspace = useRef<HTMLElement>(null);
-  const visible = useMemo(() => filterItems(items, query), [items, query]);
+  const visible = useMemo(() => filterItems(items, query, kind ?? undefined), [items, query, kind]);
   const selection = useSelection(visible.map((item) => item.id));
   const active = visible.find((item) => item.id === selection.activeId);
   const selectedKey = JSON.stringify(selectedItems(visible, selection.selected).map((item) => item.id));
@@ -78,7 +79,7 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
     const modifier = event.ctrlKey || event.metaKey;
     if (event.key === "Escape") {
       event.preventDefault();
-      if (selection.selected.size) selection.clear(); else if (query) setQuery(""); else actions.dismiss();
+      if (selection.selected.size) selection.clear(); else if (query) setQuery(""); else if (kind) setKind(null); else actions.dismiss();
       return;
     }
     if (event.key.length === 1 && event.key !== " " && !modifier && !event.altKey && !target.closest("input, textarea, select")) {
@@ -106,7 +107,10 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
         aria-controls="history-list" aria-activedescendant={selection.activeId ? `entry-${selection.activeId}` : undefined}
         onChange={(event) => { setQuery(event.target.value); selection.clear(); }} />
       {query && <button className="icon-button" aria-label="Clear search" onClick={() => { setQuery(""); search.current?.focus(); }}><X size={14} /></button>}
-    </div>{openSettings && <button className="icon-button" aria-label="Open settings" onClick={openSettings}><Settings size={16} /></button>}</header>
+    </div>
+    <button className="icon-button" aria-label="Show images" aria-pressed={kind === "image"} onClick={() => { setKind(kind === "image" ? null : "image"); selection.clear(); }}><Image size={15} /></button>
+    <button className="icon-button" aria-label="Show text" aria-pressed={kind === "text"} onClick={() => { setKind(kind === "text" ? null : "text"); selection.clear(); }}><Type size={15} /></button>
+    {openSettings && <button className="icon-button" aria-label="Open settings" onClick={openSettings}><Settings size={16} /></button>}</header>
     {(error || operationError) && <div className="error-message" role="alert">{error || operationError}{retry && <button onClick={retry}>Retry</button>}</div>}
     {selection.selected.size > 0 && <div className="selection-toolbar" aria-label="Selection actions">
       <span aria-live="polite">{selection.selected.size} selected{staging ? " · Copying…" : stageReady ? " · Ctrl+V anywhere" : ""}</span>
@@ -116,7 +120,7 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
     </div>}
     <div className="history-scroll">
       {loading ? <div className="empty-state" role="status">Loading clipboard history…</div> : visible.length === 0 ?
-        <div className="empty-state"><Clipboard size={28} aria-hidden="true" /><strong>{query ? "No matching entries" : "Your clipboard starts here"}</strong><span>{query ? "Try another word or clear your search." : "Copy text or an image to keep it nearby."}</span></div> :
+        <div className="empty-state"><Clipboard size={28} aria-hidden="true" /><strong>{query || kind ? "No matching entries" : "Your clipboard starts here"}</strong><span>{query || kind ? "Try another word or turn the filter off." : "Copy text or an image to keep it nearby."}</span></div> :
         <ul id="history-list" aria-label="Clipboard history" className="history-list">
           {visible.map((item) => editing?.id === item.id ? <li key={item.id} className="inline-editor">
             <label className="editor-label" htmlFor="edit-text">Edit</label>

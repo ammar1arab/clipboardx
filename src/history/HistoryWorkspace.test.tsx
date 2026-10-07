@@ -107,6 +107,27 @@ describe("history interactions", () => {
     expect(openSettings).toHaveBeenCalledOnce();
   });
 
+  it("filters to images or text and clears that filter on a second press", async () => {
+    const { user } = setup();
+    const images = screen.getByRole("button", { name: "Show images" });
+    const text = screen.getByRole("button", { name: "Show text" });
+    await user.click(images);
+    expect(images).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Image, 400 by 200" })).toBeVisible();
+    await user.click(images);
+    expect(images).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
+    await user.click(text);
+    expect(text).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    expect(screen.queryByRole("button", { name: "Image, 400 by 200" })).not.toBeInTheDocument();
+    await user.click(images);
+    expect(text).toHaveAttribute("aria-pressed", "false");
+    expect(images).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+  });
+
   it("pins and deletes through the row menu without pasting", async () => {
     const { user, paste } = setup();
     await user.click(menuFor("Beta https://example.test"));

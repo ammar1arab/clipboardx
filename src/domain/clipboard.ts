@@ -8,9 +8,10 @@ export type ClipboardItem = {
   | { kind: "image"; thumbnailUrl: string; filePath: string; width: number; height: number }
 );
 
-export function filterItems(items: ClipboardItem[], query: string): ClipboardItem[] {
+export function filterItems(items: ClipboardItem[], query: string, kind?: "text" | "image"): ClipboardItem[] {
   const search = query.toLocaleLowerCase();
   return items.filter((item) =>
+    (!kind || item.kind === kind) &&
     (item.kind === "text" ? item.text : `image ${item.width}×${item.height}`)
       .toLocaleLowerCase().includes(search),
   );

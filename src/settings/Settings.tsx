@@ -71,6 +71,9 @@ function SettingsForm({ close }: { close: () => void }) {
       </div>
       <div className="settings-actions">
         <button disabled={busy} type="submit">Save settings</button>
+        <button className="quit-button" disabled={busy} type="button" onClick={() => void run(async () => { await invoke("quit_app"); })}>Quit</button>
+      </div>
+      <div className="settings-actions">
         <button disabled={busy} type="button" onClick={() => void run(async () => { await invoke("clear_history", { includePinned: false }); })}>Clear unpinned</button>
         <button disabled={busy} type="button" onClick={() => setConfirmClear(true)}>Clear all history</button>
       </div>
@@ -80,7 +83,6 @@ function SettingsForm({ close }: { close: () => void }) {
         <ul>{shortcuts.map(([keys, action]) => <li key={keys}><kbd>{keys}</kbd><span>{action}</span></li>)}</ul>
         <p>Pinned entries stay when history is trimmed. On COSMIC, set Super+V in System Settings → Keyboard → Custom Shortcuts to the command clipboardx.</p>
       </details>
-      <button className="quit-button" disabled={busy} type="button" onClick={() => void run(async () => { await invoke("quit_app"); })}>Quit ClipboardX</button>
     </form>}
   </main>;
 }
