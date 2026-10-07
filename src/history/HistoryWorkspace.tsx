@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { flushSync } from "react-dom";
 import { Clipboard, X, ArrowUpRight, Trash2, Settings, Image, Type } from "lucide-react";
-import { filterItems, selectedItems, type ClipboardItem } from "../domain/clipboard";
+import { buildSearchIndex, searchItems, selectedItems, type ClipboardItem } from "../domain/clipboard";
 import { useSelection } from "./useSelection";
 import { HistoryItemRow } from "./HistoryItemRow";
 
@@ -26,7 +26,9 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
   const operationRunning = useRef(false);
   const search = useRef<HTMLInputElement>(null);
   const workspace = useRef<HTMLElement>(null);
-  const visible = useMemo(() => filterItems(items, query, kind ?? undefined), [items, query, kind]);
+  const deferredQuery = useDeferredValue(query);
+  const index = useMemo(() => buildSearchIndex(items), [items]);
+  const visible = useMemo(() => searchItems(index, deferredQuery, kind ?? undefined), [index, deferredQuery, kind]);
   const selection = useSelection(visible.map((item) => item.id));
   const active = visible.find((item) => item.id === selection.activeId);
   const selectedKey = JSON.stringify(selectedItems(visible, selection.selected).map((item) => item.id));

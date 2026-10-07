@@ -78,6 +78,16 @@ describe("history interactions", () => {
     expect(paste.mock.calls[2][0][0].id).toBe("c");
   });
 
+  it("matches words in any order", async () => {
+    const { user } = setup();
+    await user.type(screen.getByRole("textbox"), "source   alpha");
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Alpha source code" })).toBeVisible();
+    await user.keyboard("{Escape}");
+    await user.type(screen.getByRole("textbox"), "400x200");
+    expect(screen.getByRole("button", { name: "Image, 400 by 200" })).toBeVisible();
+  });
+
   it("searches multilingual text and URLs and handles empty search", async () => {
     const { user } = setup();
     await user.type(screen.getByRole("textbox"), "مرحباً");
