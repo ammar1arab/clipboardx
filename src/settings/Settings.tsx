@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { errorMessage } from "../history/useHistory";
 import { AppQuery } from "../query";
 
-type Preferences = { captureImages: boolean; pasteSeparator: string };
+type Preferences = { captureImages: boolean; pasteSeparator: string; windowWidth: number; windowHeight: number };
 type Retention = { maxItems: number; maxAgeDays: number };
 type Loaded = { preferences: Preferences; retention: Retention; autostart: boolean };
 
@@ -63,6 +63,8 @@ function SettingsForm({ close }: { close: () => void }) {
       event.preventDefault(); void run(async () => { await invoke("set_retention", { retention }); await invoke("set_settings", { settings: preferences }); });
     }}>
       <div className="settings-grid">
+        <label>Width<input type="number" min={360} max={4096} required value={preferences.windowWidth} onChange={(event) => setDraft({ ...draft!, preferences: { ...preferences, windowWidth: Number(event.target.value) }, retention, autostart })} /></label>
+        <label>Height<input type="number" min={360} max={4096} required value={preferences.windowHeight} onChange={(event) => setDraft({ ...draft!, preferences: { ...preferences, windowHeight: Number(event.target.value) }, retention, autostart })} /></label>
         <label>History limit<input type="number" min={1} max={10000} required value={retention.maxItems} onChange={(event) => setDraft({ ...draft!, retention: { ...retention, maxItems: Number(event.target.value) }, preferences, autostart })} /></label>
         <label>Keep for days<input type="number" min={1} max={3650} required value={retention.maxAgeDays} onChange={(event) => setDraft({ ...draft!, retention: { ...retention, maxAgeDays: Number(event.target.value) }, preferences, autostart })} /></label>
         <label className="setting-toggle">Capture images<input type="checkbox" checked={preferences.captureImages} onChange={(event) => setDraft({ ...draft!, preferences: { ...preferences, captureImages: event.target.checked }, retention, autostart })} /></label>

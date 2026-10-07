@@ -3,6 +3,28 @@ pub mod cosmic;
 use crate::error::AppError;
 use tauri::{AppHandle, Emitter, Manager};
 
+pub struct WindowFrame(std::sync::Mutex<(u32, u32)>);
+
+impl WindowFrame {
+    pub fn new(width: u32, height: u32) -> Self {
+        Self(std::sync::Mutex::new((width, height)))
+    }
+
+    pub fn get(&self) -> (u32, u32) {
+        *self.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    pub fn set(&self, width: u32, height: u32) {
+        *self.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = (width, height);
+    }
+}
+
+pub fn apply_saved_size(app: &AppHandle, window: &tauri::WebviewWindow) {
+    let (width, height) = app.state::<WindowFrame>().get();
+    let _ = window.unmaximize();
+    let _ = window.set_size(tauri::LogicalSize::new(width, height));
+}
+
 pub fn toggle(app: &AppHandle) -> Result<(), AppError> {
     let window = app
         .get_webview_window("main")
@@ -10,6 +32,7 @@ pub fn toggle(app: &AppHandle) -> Result<(), AppError> {
     let result = if window.is_visible().unwrap_or(false) && window.is_focused().unwrap_or(false) {
         window.hide()
     } else {
+        apply_saved_size(app, &window);
         window
             .show()
             .and_then(|_| window.set_focus())

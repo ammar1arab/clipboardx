@@ -37,7 +37,11 @@ pub fn run() {
             }
             let history =
                 tauri::async_runtime::block_on(History::open(&directory.join("history.sqlite")))?;
+            let settings = tauri::async_runtime::block_on(history.settings())
+                .map_err(|error| std::io::Error::other(error.message))?;
+            let frame = platform::WindowFrame::new(settings.window_width, settings.window_height);
             app.manage(history);
+            app.manage(frame);
             #[cfg(target_os = "linux")]
             app.manage(platform::cosmic::FocusTracker::start()?);
             app.manage(clipboard::writer::NativeClipboard::default());
@@ -54,6 +58,7 @@ pub fn run() {
             }
             if !std::env::args().any(|arg| arg == "--background") {
                 if let Some(window) = app.get_webview_window("main") {
+                    platform::apply_saved_size(app.handle(), &window);
                     window.show()?;
                     window.set_focus()?;
                 }

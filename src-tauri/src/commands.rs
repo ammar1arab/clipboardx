@@ -130,8 +130,13 @@ pub async fn get_settings(history: tauri::State<'_, History>) -> Result<Settings
 pub async fn set_settings(
     settings: Settings,
     history: tauri::State<'_, History>,
+    frame: tauri::State<'_, crate::platform::WindowFrame>,
 ) -> Result<(), AppError> {
-    history.set_settings(settings).await
+    let width = settings.window_width;
+    let height = settings.window_height;
+    history.set_settings(settings).await?;
+    frame.set(width, height);
+    Ok(())
 }
 
 #[tauri::command]

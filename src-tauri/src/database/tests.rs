@@ -263,13 +263,26 @@ fn preferences_persist_and_invalid_separator_is_atomic() {
             .set_settings(Settings {
                 capture_images: false,
                 paste_separator: " | ".into(),
+                window_width: 800,
+                window_height: 640,
             })
             .await
             .unwrap();
         assert!(history
             .set_settings(Settings {
                 capture_images: true,
-                paste_separator: "x".repeat(1025)
+                paste_separator: "x".repeat(1025),
+                window_width: 800,
+                window_height: 640,
+            })
+            .await
+            .is_err());
+        assert!(history
+            .set_settings(Settings {
+                capture_images: false,
+                paste_separator: " | ".into(),
+                window_width: 200,
+                window_height: 640,
             })
             .await
             .is_err());
@@ -278,6 +291,7 @@ fn preferences_persist_and_invalid_separator_is_atomic() {
         let settings = reopened.settings().await.unwrap();
         assert!(!settings.capture_images);
         assert_eq!(settings.paste_separator, " | ");
+        assert_eq!((settings.window_width, settings.window_height), (800, 640));
         reopened.pool.close().await;
         std::fs::remove_file(path).unwrap();
     });

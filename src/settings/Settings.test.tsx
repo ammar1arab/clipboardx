@@ -9,7 +9,7 @@ vi.mock("@tauri-apps/plugin-autostart", () => ({ enable, disable, isEnabled }));
 
 test("shows load errors with a working Retry instead of loading forever", async () => {
   invoke.mockReset();
-  invoke.mockRejectedValueOnce("Command get_settings not found").mockImplementation(async (command) => command === "get_settings" ? { captureImages: true, pasteSeparator: "\n" } : { maxItems: 500, maxAgeDays: 30 });
+  invoke.mockRejectedValueOnce("Command get_settings not found").mockImplementation(async (command) => command === "get_settings" ? { captureImages: true, pasteSeparator: "\n", windowWidth: 460, windowHeight: 520 } : { maxItems: 500, maxAgeDays: 30 });
   isEnabled.mockResolvedValue(false);
   const user = userEvent.setup();
   render(<Settings close={vi.fn()} />);
@@ -22,7 +22,7 @@ test("shows load errors with a working Retry instead of loading forever", async 
 });
 
 test("loads real preferences, saves separator and requires confirmation before deleting pins", async () => {
-  invoke.mockImplementation(async (command) => command === "get_settings" ? { captureImages: true, pasteSeparator: " | " } : command === "get_retention" ? { maxItems: 500, maxAgeDays: 30 } : undefined);
+  invoke.mockImplementation(async (command) => command === "get_settings" ? { captureImages: true, pasteSeparator: " | ", windowWidth: 460, windowHeight: 520 } : command === "get_retention" ? { maxItems: 500, maxAgeDays: 30 } : undefined);
   isEnabled.mockResolvedValue(true);
   const user = userEvent.setup();
   render(<Settings close={vi.fn()} />);
@@ -30,7 +30,9 @@ test("loads real preferences, saves separator and requires confirmation before d
   expect(screen.getByLabelText("Start at login")).toBeChecked();
   await user.clear(separator); await user.type(separator, ", ");
   await user.click(screen.getByRole("button", { name: "Save settings" }));
-  await waitFor(() => expect(invoke).toHaveBeenCalledWith("set_settings", { settings: { captureImages: true, pasteSeparator: ", " } }));
+  expect(screen.getByLabelText("Width")).toHaveValue(460);
+  expect(screen.getByLabelText("Height")).toHaveValue(520);
+  await waitFor(() => expect(invoke).toHaveBeenCalledWith("set_settings", { settings: { captureImages: true, pasteSeparator: ", ", windowWidth: 460, windowHeight: 520 } }));
   await user.click(screen.getByRole("button", { name: "Clear all history" }));
   expect(invoke).not.toHaveBeenCalledWith("clear_history", { includePinned: true });
   await user.click(screen.getByRole("button", { name: "Delete all" }));
