@@ -22,6 +22,7 @@ pub struct Settings {
     pub paste_separator: String,
     pub window_width: u32,
     pub window_height: u32,
+    pub always_on_top: bool,
 }
 
 fn validate_text(text: &str) -> Result<(), AppError> {
@@ -245,7 +246,7 @@ impl History {
 
     pub async fn settings(&self) -> Result<Settings, AppError> {
         let row = sqlx::query(
-            "SELECT capture_images, paste_separator, window_width, window_height FROM preferences WHERE singleton = 1",
+            "SELECT capture_images, paste_separator, window_width, window_height, always_on_top FROM preferences WHERE singleton = 1",
         )
         .fetch_one(&self.pool)
         .await
@@ -255,6 +256,7 @@ impl History {
             paste_separator: row.get("paste_separator"),
             window_width: row.get("window_width"),
             window_height: row.get("window_height"),
+            always_on_top: row.get("always_on_top"),
         })
     }
 
@@ -266,12 +268,13 @@ impl History {
             return Err("Window width and height must be between 360 and 4096.".into());
         }
         sqlx::query(
-            "UPDATE preferences SET capture_images = ?, paste_separator = ?, window_width = ?, window_height = ? WHERE singleton = 1",
+            "UPDATE preferences SET capture_images = ?, paste_separator = ?, window_width = ?, window_height = ?, always_on_top = ? WHERE singleton = 1",
         )
         .bind(settings.capture_images)
         .bind(settings.paste_separator)
         .bind(settings.window_width)
         .bind(settings.window_height)
+        .bind(settings.always_on_top)
         .execute(&self.pool)
         .await
         .map_err(database_error)?;

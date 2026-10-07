@@ -1,5 +1,6 @@
 use crate::database::{History, HistoryItem, Retention, Settings};
 use crate::error::AppError;
+use tauri::Manager;
 
 #[tauri::command]
 pub async fn list_history(
@@ -131,11 +132,16 @@ pub async fn set_settings(
     settings: Settings,
     history: tauri::State<'_, History>,
     frame: tauri::State<'_, crate::platform::WindowFrame>,
+    app: tauri::AppHandle,
 ) -> Result<(), AppError> {
     let width = settings.window_width;
     let height = settings.window_height;
+    let on_top = settings.always_on_top;
     history.set_settings(settings).await?;
     frame.set(width, height);
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_always_on_top(on_top);
+    }
     Ok(())
 }
 

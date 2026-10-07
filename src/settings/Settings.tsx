@@ -6,7 +6,7 @@ import { ArrowLeft, Keyboard } from "lucide-react";
 import { errorMessage } from "../history/useHistory";
 import { AppQuery } from "../query";
 
-type Preferences = { captureImages: boolean; pasteSeparator: string; windowWidth: number; windowHeight: number };
+type Preferences = { captureImages: boolean; pasteSeparator: string; windowWidth: number; windowHeight: number; alwaysOnTop: boolean };
 type Retention = { maxItems: number; maxAgeDays: number };
 type Loaded = { preferences: Preferences; retention: Retention; autostart: boolean };
 
@@ -84,6 +84,10 @@ function SettingsForm({ close }: { close: () => void }) {
     {!loaded ? !error && <div role="status">Loading settings…</div> : preferences && retention && <form className="settings-form" onSubmit={(event) => {
       event.preventDefault(); void run(async () => { await invoke("set_retention", { retention }); await invoke("set_settings", { settings: preferences }); });
     }}>
+      <div className="mode-switch" role="group" aria-label="Window">
+        <button type="button" aria-pressed={!preferences.alwaysOnTop} onClick={() => { const next = { ...preferences, alwaysOnTop: false }; setDraft({ ...draft!, preferences: next, retention, autostart }); void run(async () => { await invoke("set_settings", { settings: next }); }); }}>Always show</button>
+        <button type="button" aria-pressed={preferences.alwaysOnTop} onClick={() => { const next = { ...preferences, alwaysOnTop: true }; setDraft({ ...draft!, preferences: next, retention, autostart }); void run(async () => { await invoke("set_settings", { settings: next }); }); }}>On top</button>
+      </div>
       <div className="settings-grid">
         <label>Width<input type="number" min={360} max={4096} required value={preferences.windowWidth} onChange={(event) => setDraft({ ...draft!, preferences: { ...preferences, windowWidth: Number(event.target.value) }, retention, autostart })} /></label>
         <label>Height<input type="number" min={360} max={4096} required value={preferences.windowHeight} onChange={(event) => setDraft({ ...draft!, preferences: { ...preferences, windowHeight: Number(event.target.value) }, retention, autostart })} /></label>

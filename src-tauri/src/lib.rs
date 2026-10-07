@@ -59,17 +59,25 @@ pub fn run() {
             if !std::env::args().any(|arg| arg == "--background") {
                 if let Some(window) = app.get_webview_window("main") {
                     platform::apply_saved_size(app.handle(), &window);
+                    let _ = window.set_always_on_top(settings.always_on_top);
                     window.show()?;
                     window.set_focus()?;
                 }
             }
             Ok(())
         })
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close();
                 let _ = window.hide();
             }
+            tauri::WindowEvent::Focused(false)
+                if window.is_visible().unwrap_or(false) && window.is_minimized().unwrap_or(false) =>
+            {
+                let _ = window.unminimize();
+                let _ = window.show();
+            }
+            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             commands::list_history,
