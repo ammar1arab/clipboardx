@@ -89,13 +89,7 @@ pub async fn stage_selection(
     history: tauri::State<'_, History>,
     clipboard: tauri::State<'_, crate::clipboard::writer::NativeClipboard>,
 ) -> Result<(), AppError> {
-    clipboard
-        .write_text(
-            history
-                .selected_text(&ids, &history.settings().await?.paste_separator)
-                .await?,
-        )
-        .await
+    clipboard.write_selection(&history, &ids).await
 }
 
 #[tauri::command]
@@ -107,13 +101,7 @@ pub async fn paste_entries(
     app: tauri::AppHandle,
 ) -> Result<(), AppError> {
     let _operation = clipboard.operation.lock().await;
-    clipboard
-        .write_unlocked(
-            history
-                .selected_text(&ids, &history.settings().await?.paste_separator)
-                .await?,
-        )
-        .await?;
+    clipboard.write_selection_unlocked(&history, &ids).await?;
     history.mark_used(&ids).await?;
     #[cfg(target_os = "linux")]
     {

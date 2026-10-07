@@ -2,6 +2,7 @@ mod clipboard;
 mod commands;
 mod database;
 mod error;
+mod images;
 mod platform;
 
 use database::History;

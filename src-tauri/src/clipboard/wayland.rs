@@ -36,7 +36,11 @@ fn text_mime(types: &[String]) -> Option<&str> {
     .find(|candidate| types.iter().any(|mime| mime == candidate))
 }
 
-fn read_text(mut reader: impl Read + AsFd, stop: &AtomicBool) -> Result<String, &'static str> {
+fn read_bytes(
+    mut reader: impl Read + AsFd,
+    stop: &AtomicBool,
+    limit: usize,
+) -> Result<Vec<u8>, &'static str> {
     let deadline = Instant::now() + READ_DEADLINE;
     let mut contents = Vec::new();
     let mut buffer = [0u8; 8192];
@@ -62,12 +66,18 @@ fn read_text(mut reader: impl Read + AsFd, stop: &AtomicBool) -> Result<String, 
         if length == 0 {
             break;
         }
-        if contents.len() + length > MAX_TEXT_BYTES {
+        if contents.len() + length > limit {
             return Err("Clipboard text exceeds the 1 MiB capture limit.");
         }
         contents.extend_from_slice(&buffer[..length]);
     }
-    String::from_utf8(contents).map_err(|_| "Clipboard text is not valid UTF-8.")
+    Ok(contents)
+}
+
+#[cfg(test)]
+fn read_text(reader: impl Read + AsFd, stop: &AtomicBool) -> Result<String, &'static str> {
+    String::from_utf8(read_bytes(reader, stop, MAX_TEXT_BYTES)?)
+        .map_err(|_| "Clipboard text is not valid UTF-8.")
 }
 
 pub(super) fn watch(
@@ -88,24 +98,30 @@ pub(super) fn watch(
                     if stop.load(Ordering::Acquire) { break; }
                     match watcher.next_event() {
                         Ok(Some(ClipboardEvent::Changed { mime_types, mut offer, .. })) => {
-                            let Some(mime) = text_mime(&mime_types) else { continue; };
-                            let result = offer.receive(mime)
-                                .map_err(|_| "Could not receive clipboard text. Copy again to retry.")
-                                .and_then(|reader| read_text(reader, &stop));
-                            match result {
-                                Ok(text) if !text.is_empty() => {
-                                    let history = app.state::<History>();
-                                    match tauri::async_runtime::block_on(history.capture_text(&text)) {
-                                        Ok(()) => {
-                                            publish_status(&app, &status, CaptureStatus::Running);
-                                            if app.emit("history-changed", ()).is_err() {
-                                                publish_status(&app, &status, CaptureStatus::Error { message: "History saved, but the interface could not refresh. Reopen ClipboardX." });
-                                            }
-                                        }
-                                        Err(_) => publish_status(&app, &status, CaptureStatus::Error { message: "Could not save clipboard text. Check storage and copy again." }),
-                                    }
+                            if mime_types.iter().any(|mime| mime == "application/x-kde-passwordManagerHint") { continue; }
+                            let history = app.state::<History>();
+                            let capture_images = match tauri::async_runtime::block_on(history.settings()) {
+                                Ok(settings) => settings.capture_images,
+                                Err(_) => { publish_status(&app, &status, CaptureStatus::Error { message: "Could not read capture settings. Retry." }); continue; }
+                            };
+                            let image_mime = if capture_images { ["image/png", "image/jpeg", "image/bmp", "image/tiff"].into_iter().find(|mime| mime_types.iter().any(|candidate| candidate == mime)) } else { None };
+                            let Some(mime) = image_mime.or_else(|| text_mime(&mime_types)) else { continue; };
+                            let result = offer.receive(mime).map_err(|_| "Could not receive clipboard contents. Copy again.")
+                                .and_then(|reader| read_bytes(reader, &stop, if image_mime.is_some() { 64 * 1024 * 1024 } else { MAX_TEXT_BYTES }));
+                            let saved = match result {
+                                Ok(bytes) if image_mime.is_some() => tauri::async_runtime::block_on(history.capture_image(bytes)).map_err(|_| "Could not save image. Check image limits and storage."),
+                                Ok(bytes) => match String::from_utf8(bytes) {
+                                    Ok(text) if text.is_empty() => Ok(()),
+                                    Ok(text) => tauri::async_runtime::block_on(history.capture_text(&text)).map_err(|_| "Could not save clipboard text. Check storage."),
+                                    Err(_) => Err("Clipboard text is not valid UTF-8."),
+                                },
+                                Err(message) => Err(message),
+                            };
+                            match saved {
+                                Ok(()) => {
+                                    publish_status(&app, &status, CaptureStatus::Running);
+                                    if app.emit("history-changed", ()).is_err() { publish_status(&app, &status, CaptureStatus::Error { message: "History saved. Reopen ClipboardX to refresh." }); }
                                 }
-                                Ok(_) => publish_status(&app, &status, CaptureStatus::Running),
                                 Err(message) => publish_status(&app, &status, CaptureStatus::Error { message }),
                             }
                         }

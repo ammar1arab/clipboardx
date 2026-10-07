@@ -282,3 +282,53 @@ fn preferences_persist_and_invalid_separator_is_atomic() {
         std::fs::remove_file(path).unwrap();
     });
 }
+
+#[test]
+fn images_persist_deduplicate_and_deletion_cleans_files() {
+    tauri::async_runtime::block_on(async {
+        let root = std::env::temp_dir().join(format!("clipboardx-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        let path = root.join("history.sqlite");
+        let history = History::open(&path).await.unwrap();
+        let image = image::DynamicImage::new_rgba8(16, 16);
+        let mut bytes = std::io::Cursor::new(Vec::new());
+        image.write_to(&mut bytes, image::ImageFormat::Png).unwrap();
+        history
+            .capture_image(bytes.get_ref().clone())
+            .await
+            .unwrap();
+        history
+            .capture_image(bytes.get_ref().clone())
+            .await
+            .unwrap();
+        let items = history.list().await.unwrap();
+        assert_eq!(items.len(), 1);
+        let id = items[0].id.clone();
+        let file = items[0].image_path.clone().unwrap();
+        let thumbnail = items[0].thumbnail_path.clone().unwrap();
+        history.set_pinned(&id, true).await.unwrap();
+        history.clear(false).await.unwrap();
+        assert!(Path::new(&file).exists());
+        assert!(history
+            .selected_text(std::slice::from_ref(&id), "\n")
+            .await
+            .is_err());
+        assert_eq!(
+            history
+                .selected_image(std::slice::from_ref(&id))
+                .await
+                .unwrap()
+                .unwrap()
+                .width,
+            16
+        );
+        history.pool.close().await;
+        let reopened = History::open(&path).await.unwrap();
+        assert!(reopened.list().await.unwrap()[0].pinned);
+        reopened.delete(&[id]).await.unwrap();
+        assert!(!Path::new(&file).exists());
+        assert!(!Path::new(&thumbnail).exists());
+        reopened.pool.close().await;
+        std::fs::remove_dir_all(root).unwrap();
+    });
+}
