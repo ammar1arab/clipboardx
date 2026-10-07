@@ -80,5 +80,5 @@ export function useHistory() {
     try { await invoke("retry_capture"); await refresh(); }
     catch (failure) { setError(errorMessage(failure)); }
   }
-  return { items, actions, loading, error: error ?? capture.message, retry, launchCount };
+  return { items, actions, loading, error: error ?? capture.message, retry, launchCount, refresh };
 }

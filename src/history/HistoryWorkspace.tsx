@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Clipboard, Search, X, ArrowUpRight, Trash2 } from "lucide-react";
+import { Clipboard, Search, X, ArrowUpRight, Trash2, Settings } from "lucide-react";
 import { filterItems, selectedItems, type ClipboardItem } from "../domain/clipboard";
 import { useSelection } from "./useSelection";
 import { HistoryItemRow } from "./HistoryItemRow";
@@ -12,9 +12,9 @@ export type HistoryActions = {
   edit: (id: string, text: string) => Promise<void>;
   dismiss: () => void;
 };
-type Props = { items: ClipboardItem[]; actions: HistoryActions; loading?: boolean; error?: string; retry?: () => void; launchCount?: number };
+type Props = { items: ClipboardItem[]; actions: HistoryActions; loading?: boolean; error?: string; retry?: () => void; launchCount?: number; openSettings?: () => void };
 
-export function HistoryWorkspace({ items, actions, loading, error, retry, launchCount }: Props) {
+export function HistoryWorkspace({ items, actions, loading, error, retry, launchCount, openSettings }: Props) {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
@@ -94,7 +94,7 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
     }
   }
   return <main className="workspace" onKeyDown={onKeyDown} aria-busy={busy || loading}>
-    <header className="titlebar"><span className="brand"><Clipboard size={17} aria-hidden="true" /> ClipboardX</span><span className="privacy-label">Local history</span></header>
+    <header className="titlebar"><span className="brand"><Clipboard size={17} aria-hidden="true" /> ClipboardX</span>{openSettings ? <button className="icon-button" aria-label="Open settings" onClick={openSettings}><Settings size={16} /></button> : <span className="privacy-label">Local history</span>}</header>
     <div className="searchbar"><Search size={17} aria-hidden="true" />
       <input ref={search} autoFocus aria-label="Search clipboard history" placeholder="Search your clipboard…" value={query}
         aria-controls="history-list" aria-activedescendant={selection.activeId ? `entry-${selection.activeId}` : undefined}

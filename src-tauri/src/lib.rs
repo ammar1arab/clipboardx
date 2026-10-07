@@ -19,7 +19,11 @@ pub fn run() {
                 }
             }
         }))
-        .plugin(tauri_plugin_autostart::Builder::new().build())
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .args(["--background"])
+                .build(),
+        )
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             let directory = app.path().app_data_dir()?;
@@ -73,6 +77,9 @@ pub fn run() {
             commands::retry_capture,
             commands::hide_window,
             commands::stage_selection,
+            commands::get_settings,
+            commands::set_settings,
+            commands::quit_app,
             commands::paste_entries
         ])
         .build(tauri::generate_context!());

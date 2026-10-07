@@ -56,3 +56,11 @@ kbd { font: inherit; border: 1px solid var(--color-line); border-radius: 3px; pa
 .editor-actions span { color: var(--color-muted); font-size: 10px; flex: 1; }
 @media (max-width: 390px) { .workspace { padding: 10px; } .statusbar { flex-wrap: wrap; } .item-actions { flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+
+.settings-form { display: flex; flex-direction: column; gap: 14px; padding: 3px; }
+.settings-form label { display: flex; flex-direction: column; gap: 7px; }
+.settings-form input:not([type="checkbox"]), .settings-form textarea { background: var(--color-raised); border: 1px solid var(--color-line); border-radius: 6px; color: var(--color-ink); padding: 8px; }
+.settings-form .setting-toggle { flex-direction: row; justify-content: space-between; align-items: center; }
+.settings-form button, .quit-button { background: var(--color-raised); border: 1px solid var(--color-line); border-radius: 6px; padding: 7px 10px; }
+.settings-hint { color: var(--color-muted); font-size: 11px; line-height: 1.5; margin: 0; }
+.settings-danger { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--color-line); }

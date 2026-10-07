@@ -253,3 +253,32 @@ fn selection_text_follows_history_order_and_rejects_missing_entries() {
         assert!(history.selected_text(&[], "\n").await.is_err());
     });
 }
+
+#[test]
+fn preferences_persist_and_invalid_separator_is_atomic() {
+    tauri::async_runtime::block_on(async {
+        let path = std::env::temp_dir().join(format!("clipboardx-{}.sqlite", uuid::Uuid::new_v4()));
+        let history = History::open(&path).await.unwrap();
+        history
+            .set_settings(Settings {
+                capture_images: false,
+                paste_separator: " | ".into(),
+            })
+            .await
+            .unwrap();
+        assert!(history
+            .set_settings(Settings {
+                capture_images: true,
+                paste_separator: "x".repeat(1025)
+            })
+            .await
+            .is_err());
+        history.pool.close().await;
+        let reopened = History::open(&path).await.unwrap();
+        let settings = reopened.settings().await.unwrap();
+        assert!(!settings.capture_images);
+        assert_eq!(settings.paste_separator, " | ");
+        reopened.pool.close().await;
+        std::fs::remove_file(path).unwrap();
+    });
+}

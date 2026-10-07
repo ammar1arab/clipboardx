@@ -1,4 +1,4 @@
-use crate::database::{History, HistoryItem, Retention};
+use crate::database::{History, HistoryItem, Retention, Settings};
 use crate::error::AppError;
 
 #[tauri::command]
@@ -90,7 +90,11 @@ pub async fn stage_selection(
     clipboard: tauri::State<'_, crate::clipboard::writer::NativeClipboard>,
 ) -> Result<(), AppError> {
     clipboard
-        .write_text(history.selected_text(&ids, "\n\n").await?)
+        .write_text(
+            history
+                .selected_text(&ids, &history.settings().await?.paste_separator)
+                .await?,
+        )
         .await
 }
 
@@ -104,8 +108,13 @@ pub async fn paste_entries(
 ) -> Result<(), AppError> {
     let _operation = clipboard.operation.lock().await;
     clipboard
-        .write_unlocked(history.selected_text(&ids, "\n\n").await?)
+        .write_unlocked(
+            history
+                .selected_text(&ids, &history.settings().await?.paste_separator)
+                .await?,
+        )
         .await?;
+    history.mark_used(&ids).await?;
     #[cfg(target_os = "linux")]
     {
         use tauri::Manager;
@@ -122,4 +131,22 @@ pub async fn paste_entries(
             "Native paste is currently implemented for COSMIC Wayland.",
         ))
     }
+}
+
+#[tauri::command]
+pub async fn get_settings(history: tauri::State<'_, History>) -> Result<Settings, AppError> {
+    history.settings().await
+}
+
+#[tauri::command]
+pub async fn set_settings(
+    settings: Settings,
+    history: tauri::State<'_, History>,
+) -> Result<(), AppError> {
+    history.set_settings(settings).await
+}
+
+#[tauri::command]
+pub fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
 }

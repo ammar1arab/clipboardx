@@ -14,6 +14,13 @@ pub struct Retention {
     pub max_age_days: u32,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Settings {
+    pub capture_images: bool,
+    pub paste_separator: String,
+}
+
 fn validate_text(text: &str) -> Result<(), AppError> {
     if text.is_empty() || text.len() > MAX_TEXT_BYTES || text.contains('\0') {
         return Err("Clipboard text must contain 1–1048576 bytes and no NUL characters".into());
@@ -216,6 +223,47 @@ impl History {
             .execute(&self.pool)
             .await
             .map_err(database_error)?;
+        Ok(())
+    }
+
+    pub async fn settings(&self) -> Result<Settings, AppError> {
+        let row = sqlx::query(
+            "SELECT capture_images, paste_separator FROM preferences WHERE singleton = 1",
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(database_error)?;
+        Ok(Settings {
+            capture_images: row.get("capture_images"),
+            paste_separator: row.get("paste_separator"),
+        })
+    }
+
+    pub async fn set_settings(&self, settings: Settings) -> Result<(), AppError> {
+        if settings.paste_separator.len() > 1024 || settings.paste_separator.contains('\0') {
+            return Err("Paste separator must be at most 1024 bytes without NUL characters".into());
+        }
+        sqlx::query(
+            "UPDATE preferences SET capture_images = ?, paste_separator = ? WHERE singleton = 1",
+        )
+        .bind(settings.capture_images)
+        .bind(settings.paste_separator)
+        .execute(&self.pool)
+        .await
+        .map_err(database_error)?;
+        Ok(())
+    }
+
+    pub async fn mark_used(&self, ids: &[String]) -> Result<(), AppError> {
+        for id in ids {
+            validate_id(id)?;
+            sqlx::query("UPDATE clipboard_items SET last_used_at = ? WHERE id = ?")
+                .bind(chrono::Utc::now().timestamp_millis())
+                .bind(id)
+                .execute(&self.pool)
+                .await
+                .map_err(database_error)?;
+        }
         Ok(())
     }
 
