@@ -21,6 +21,7 @@ use wayland_client::{
 type Reply = mpsc::Sender<Result<bool, AppError>>;
 enum Request {
     Restore(Reply),
+    FocusedTerminal(mpsc::Sender<bool>),
     Stop,
 }
 struct Toplevel {
@@ -65,6 +66,7 @@ fn terminal(app_id: &str) -> bool {
     [
         "terminal",
         "cosmicterm",
+        "cosmic-term",
         "alacritty",
         "kitty",
         "wezterm",
@@ -203,6 +205,14 @@ impl FocusTracker {
         })
     }
 
+    pub fn focused_terminal(&self) -> bool {
+        let (reply, response) = mpsc::channel();
+        if self.requests.send(Request::FocusedTerminal(reply)).is_err() {
+            return false;
+        }
+        response.recv_timeout(Duration::from_millis(200)).unwrap_or(false)
+    }
+
     pub async fn restore(&self) -> Result<bool, AppError> {
         let requests = self.requests.clone();
         tauri::async_runtime::spawn_blocking(move || {
@@ -272,6 +282,12 @@ fn run(requests: mpsc::Receiver<Request>, ready: &mpsc::Sender<Result<(), ()>>) 
         while let Ok(request) = requests.try_recv() {
             match request {
                 Request::Stop => return Ok(()),
+                Request::FocusedTerminal(reply) => {
+                    let active = state.windows.iter().any(|window| {
+                        window.active && terminal(&window.app_id) && !own_app(&window.app_id)
+                    });
+                    let _ = reply.send(active);
+                }
                 Request::Restore(reply) => {
                     if state.pending.is_some() {
                         let _ = reply.send(Err(failure("A paste is already in progress.")));
@@ -314,6 +330,7 @@ mod tests {
     #[test]
     fn paste_keys_distinguish_terminal_and_editor_targets() {
         assert!(terminal("com.system76.CosmicTerm"));
+        assert!(terminal("cosmic-term"));
         assert!(terminal("org.gnome.Terminal"));
         assert!(!terminal("cursor"));
         assert!(!terminal("google-chrome"));

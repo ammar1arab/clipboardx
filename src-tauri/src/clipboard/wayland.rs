@@ -110,6 +110,45 @@ fn read_text(reader: impl Read + AsFd, stop: &AtomicBool) -> Result<String, &'st
         .map_err(|_| "Clipboard text is not valid UTF-8.")
 }
 
+fn selection_should_copy(from_terminal: bool, text: &str, previous: &str) -> bool {
+    from_terminal && !text.trim().is_empty() && text != previous
+}
+
+fn startup_primary(seen: &mut bool) -> bool {
+    if *seen {
+        return false;
+    }
+    *seen = true;
+    true
+}
+
+fn promote_terminal_selection(incoming: mpsc::Receiver<String>) {
+    let Ok(mut clipboard) = arboard::Clipboard::new() else {
+        return;
+    };
+    let mut last = String::new();
+    while let Ok(mut latest) = incoming.recv() {
+        loop {
+            match incoming.recv_timeout(Duration::from_millis(200)) {
+                Ok(newer) => latest = newer,
+                Err(mpsc::RecvTimeoutError::Timeout) => break,
+                Err(mpsc::RecvTimeoutError::Disconnected) => return,
+            }
+        }
+        if !selection_should_copy(true, &latest, &last) {
+            continue;
+        }
+        if clipboard.set_text(latest.clone()).is_ok() {
+            last = latest;
+        }
+    }
+}
+
+fn focused_terminal(app: &AppHandle) -> bool {
+    app.try_state::<crate::platform::cosmic::FocusTracker>()
+        .is_some_and(|tracker| tracker.focused_terminal())
+}
+
 pub(super) fn watch(
     app: AppHandle,
     stop: Arc<AtomicBool>,
@@ -118,15 +157,36 @@ pub(super) fn watch(
     retry: mpsc::Receiver<()>,
 ) {
     while !stop.load(Ordering::Acquire) {
-        match Watcher::new(ClipboardType::Regular, Seat::Unspecified) {
+        let watcher = Watcher::new(ClipboardType::Both, Seat::Unspecified)
+            .or_else(|_| Watcher::new(ClipboardType::Regular, Seat::Unspecified));
+        match watcher {
             Ok(mut watcher) => {
                 if let Ok(mut handle) = cancel.lock() { *handle = Some(watcher.cancel_handle()); }
                 if stop.load(Ordering::Acquire) { break; }
                 if retry.try_recv().is_ok() { continue; }
                 publish_status(&app, &status, CaptureStatus::Running);
+                let (primary_tx, primary_rx) = mpsc::channel();
+                let promoter = std::thread::Builder::new()
+                    .name("clipboardx-select-copy".into())
+                    .spawn(move || promote_terminal_selection(primary_rx))
+                    .ok();
+                let mut saw_primary = false;
                 loop {
                     if stop.load(Ordering::Acquire) { break; }
                     match watcher.next_event() {
+                        Ok(Some(ClipboardEvent::Changed { clipboard, mime_types, mut offer, .. }))
+                            if clipboard == wl_clipboard_rs::paste::ClipboardType::Primary =>
+                        {
+                            if startup_primary(&mut saw_primary) { continue; }
+                            if !focused_terminal(&app) { continue; }
+                            let Some(mime) = text_mime(&mime_types) else { continue; };
+                            let Ok(reader) = offer.receive(mime) else { continue; };
+                            let Ok(bytes) = read_bytes(reader, &stop, MAX_TEXT_BYTES, READ_DEADLINE) else { continue; };
+                            let Ok(text) = String::from_utf8(bytes) else { continue; };
+                            if selection_should_copy(true, &text, "") {
+                                let _ = primary_tx.send(text);
+                            }
+                        }
                         Ok(Some(ClipboardEvent::Changed { mime_types, mut offer, .. })) => {
                             if mime_types.iter().any(|mime| mime == "application/x-kde-passwordManagerHint") { continue; }
                             let history = app.state::<History>();
@@ -155,13 +215,23 @@ pub(super) fn watch(
                                 Err(message) => publish_status(&app, &status, CaptureStatus::Error { message }),
                             }
                         }
-                        Ok(Some(ClipboardEvent::Cleared { .. })) => publish_status(&app, &status, CaptureStatus::Running),
+                        Ok(Some(ClipboardEvent::Cleared { clipboard, .. })) => {
+                            if clipboard == wl_clipboard_rs::paste::ClipboardType::Primary {
+                                let _ = startup_primary(&mut saw_primary);
+                            } else {
+                                publish_status(&app, &status, CaptureStatus::Running);
+                            }
+                        }
                         Ok(None) => break,
                         Err(_) => {
                             publish_status(&app, &status, CaptureStatus::Unavailable { message: "Lost Wayland clipboard connection. Retrying automatically." });
                             break;
                         }
                     }
+                }
+                drop(primary_tx);
+                if let Some(promoter) = promoter {
+                    let _ = promoter.join();
                 }
             }
             Err(_) => publish_status(&app, &status, CaptureStatus::Unavailable { message: "Wayland clipboard capture is unavailable. Check compositor data-control support. Retrying automatically." }),
@@ -188,6 +258,17 @@ mod tests {
     fn pipe() -> (File, File) {
         let (reader, writer) = nix::unistd::pipe().unwrap();
         (File::from(reader), File::from(writer))
+    }
+
+    #[test]
+    fn copies_a_finished_terminal_selection_once() {
+        assert!(selection_should_copy(true, "ls -la\n", ""));
+        assert!(!selection_should_copy(false, "ls -la\n", ""));
+        assert!(!selection_should_copy(true, "   \n", ""));
+        assert!(!selection_should_copy(true, "ls -la\n", "ls -la\n"));
+        let mut seen = false;
+        assert!(startup_primary(&mut seen));
+        assert!(!startup_primary(&mut seen));
     }
 
     #[test]

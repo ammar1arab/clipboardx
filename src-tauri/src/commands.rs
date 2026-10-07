@@ -136,14 +136,13 @@ pub async fn set_settings(
 ) -> Result<(), AppError> {
     let width = settings.window_width;
     let height = settings.window_height;
-    let on_top = settings.always_on_top;
     history.set_settings(settings).await?;
     frame.set(width, height);
     let window = app.get_webview_window("main");
     let app_for_ui = app.clone();
     let _ = app.run_on_main_thread(move || {
         if let Some(window) = window {
-            crate::platform::apply_on_top(&app_for_ui, &window, on_top, true);
+            crate::platform::apply_saved_size(&app_for_ui, &window);
         }
     });
     Ok(())

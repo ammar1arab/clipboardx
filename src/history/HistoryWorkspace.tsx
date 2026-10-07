@@ -143,6 +143,6 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
             pin={() => void run(() => actions.pin(item.id, !item.pinned))} edit={() => beginEdit(item)} remove={() => void run(() => actions.remove([item.id]))} />)}
         </ul>}
     </div>
-    <footer className="statusbar"><span>{visible.length} {visible.length === 1 ? "entry" : "entries"}</span><span><kbd>↑↓</kbd> Navigate <kbd>↵</kbd> Paste <kbd>Esc</kbd> Close</span></footer>
+    <footer className="statusbar"><span>{visible.length} {visible.length === 1 ? "entry" : "entries"}</span><span>Click to paste <kbd>↑↓</kbd> Move <kbd>↵</kbd> Paste <kbd>Esc</kbd> Close</span></footer>
   </main>;
 }

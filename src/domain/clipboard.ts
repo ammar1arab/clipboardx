@@ -38,6 +38,18 @@ export function filterItems(items: ClipboardItem[], query: string, kind?: "text"
   return searchItems(buildSearchIndex(items), query, kind);
 }
 
+export function formatClipAge(at: number, now = Date.now()): string {
+  const delta = Math.max(0, now - at);
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (delta < minute) return "Just now";
+  if (delta < hour) return `${Math.floor(delta / minute)}m ago`;
+  if (delta < day) return `${Math.floor(delta / hour)}h ago`;
+  if (delta < 7 * day) return `${Math.floor(delta / day)}d ago`;
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(at);
+}
+
 export function selectedItems(items: ClipboardItem[], selected: Set<string>): ClipboardItem[] {
   return items.filter((item) => selected.has(item.id));
 }

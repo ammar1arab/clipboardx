@@ -1,6 +1,6 @@
 import { MoreVertical, Pin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { ClipboardItem } from "../domain/clipboard";
+import { formatClipAge, type ClipboardItem } from "../domain/clipboard";
 
 type Props = {
   item: ClipboardItem; active: boolean; selected: boolean;
@@ -44,7 +44,9 @@ export function HistoryItemRow({ item, active, selected, choose, paste, pin, edi
       }}>
       {item.kind === "text" ? <span className="text-preview" dir="auto">{item.text}</span> :
         <img className="thumbnail" src={item.thumbnailUrl} alt={`${item.width} × ${item.height} clipboard image`} loading="lazy" />}
-      <span className="item-meta">{item.kind === "text" ? `${item.text.length.toLocaleString()} characters` : `${item.width} × ${item.height}`}
+      <span className="item-meta">
+        <span>{formatClipAge(item.lastUsedAt ?? item.createdAt)}</span>
+        <span>{item.kind === "text" ? `${item.text.length.toLocaleString()} characters` : `${item.width} × ${item.height}`}</span>
         {item.pinned && <span className="pin-label"><Pin size={10} aria-hidden="true" /> Pinned</span>}
       </span>
     </div>
