@@ -597,6 +597,7 @@ dependencies = [
  "arboard",
  "chrono",
  "hex",
+ "nix",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -609,6 +610,7 @@ dependencies = [
  "tauri-plugin-sql",
  "tauri-plugin-store",
  "uuid",
+ "wl-clipboard-rs",
 ]
 
 [[package]]

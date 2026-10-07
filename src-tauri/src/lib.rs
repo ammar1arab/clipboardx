@@ -1,3 +1,4 @@
+mod clipboard;
 mod commands;
 mod database;
 mod error;
@@ -7,7 +8,7 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_sql::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_autostart::Builder::new().build())
@@ -24,6 +25,7 @@ pub fn run() {
             let history =
                 tauri::async_runtime::block_on(History::open(&directory.join("history.sqlite")))?;
             app.manage(history);
+            app.manage(clipboard::CaptureMonitor::start(app.handle().clone())?);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -34,8 +36,19 @@ pub fn run() {
             commands::clear_history,
             commands::set_pinned,
             commands::get_retention,
-            commands::set_retention
+            commands::set_retention,
+            commands::get_capture_status,
+            commands::retry_capture
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!());
+    match app {
+        Ok(app) => app.run(|handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                handle.state::<clipboard::CaptureMonitor>().stop();
+            }
+        }),
+        Err(_) => {
+            eprintln!("ClipboardX could not start. Check app-data access and desktop support.")
+        }
+    }
 }

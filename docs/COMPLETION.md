@@ -41,7 +41,15 @@ This ledger records requirements, not a claim of production readiness.
   recopy promotion, invalid operation atomicity, settings/pin persistence and cleanup.
   Native commands return `{ code, message }` errors without database/clipboard details.
   Image insertion and filesystem cleanup will be verified in milestone 4.
-- Clipboard monitoring, images, live history integration, native paste, launcher, settings,
+- Milestone 3 implements event-driven Wayland text capture on a dedicated Rust worker,
+  bounded 1 MiB/2-second offer reads, UTF-8 validation, exclusion-hint handling,
+  automatic reconnection, status/retry commands and cancellation on app exit.
+- Thirteen deterministic Rust tests pass; one live-desktop test is excluded from ordinary
+  CI and was run explicitly with `cargo test --offline live_wayland_text_events_and_cancellation
+  -- --ignored --test-threads=1`: passed on the current COSMIC Wayland session. It verifies
+  short English, mixed Arabic/English multiline text, URL offers and watcher cancellation.
+  This verifies native event transfer, not copying from named applications or popup paste.
+- Images, live history integration, native paste, launcher, settings,
   autostart state, release packaging and hardening remain outstanding.
 
 ## Required automated gates

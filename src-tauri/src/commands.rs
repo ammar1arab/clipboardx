@@ -62,3 +62,15 @@ pub async fn clear_history(
 ) -> Result<(), AppError> {
     history.clear(include_pinned).await
 }
+
+#[tauri::command]
+pub fn get_capture_status(
+    monitor: tauri::State<'_, crate::clipboard::CaptureMonitor>,
+) -> Result<crate::clipboard::CaptureStatus, AppError> {
+    monitor.status()
+}
+
+#[tauri::command]
+pub fn retry_capture(monitor: tauri::State<'_, crate::clipboard::CaptureMonitor>) {
+    monitor.retry();
+}
