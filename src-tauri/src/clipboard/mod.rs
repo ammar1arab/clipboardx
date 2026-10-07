@@ -1,5 +1,6 @@
 #[cfg(target_os = "linux")]
 mod wayland;
+pub mod writer;
 
 use crate::error::AppError;
 use serde::Serialize;

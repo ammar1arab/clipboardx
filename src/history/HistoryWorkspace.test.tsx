@@ -1,4 +1,4 @@
-import { render, screen, within, waitFor } from "@testing-library/react";
+import { render, screen, within, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { useState } from "react";
@@ -22,10 +22,11 @@ function setup() {
   const paste = vi.fn().mockResolvedValue(undefined);
   const dismiss = vi.fn();
   const edit = vi.fn();
+  const stage = vi.fn().mockResolvedValue(undefined);
   function Harness() {
     const [items, setItems] = useState(fixtures);
     const actions: HistoryActions = {
-      paste, dismiss,
+      paste, dismiss, stage,
       remove: async (ids) => setItems((current) => current.filter((item) => !ids.includes(item.id))),
       pin: async (id, pinned) => setItems((current) => current.map((item) => item.id === id ? { ...item, pinned } : item)),
       edit: async (id, text) => {
@@ -36,10 +37,32 @@ function setup() {
     return <HistoryWorkspace items={items} actions={actions} />;
   }
   render(<Harness />);
-  return { user: userEvent.setup(), paste, dismiss, edit };
+  return { user: userEvent.setup(), paste, dismiss, edit, stage };
 }
 
 describe("history interactions", () => {
+  it("stages the full selection for external Ctrl+V and deletes a filtered selection", async () => {
+    const { user, stage } = setup();
+    await user.keyboard("{Control>}a{/Control}");
+    await waitFor(() => expect(stage).toHaveBeenCalledWith(["a", "b", "c", "d"]));
+    await screen.findByText(/Ctrl\+V anywhere/);
+    await user.keyboard("{Escape}");
+    await user.type(screen.getByRole("textbox"), "Alpha");
+    await user.keyboard("{Control>}a{/Control}{Delete}");
+    expect(screen.getByText("No matching entries")).toBeVisible();
+    await user.keyboard("{Escape}");
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+  });
+
+  it("exports exact text for native input drag and never pastes on drag-start", () => {
+    const { paste } = setup();
+    const dataTransfer = { setData: vi.fn(), effectAllowed: "none" };
+    fireEvent.dragStart(screen.getByRole("button", { name: "مرحباً English" }), { dataTransfer });
+    expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "مرحباً English");
+    expect(dataTransfer.effectAllowed).toBe("copy");
+    expect(paste).not.toHaveBeenCalled();
+  });
+
   it("focuses search, navigates with boundaries and pastes the active item", async () => {
     const { user, paste } = setup();
     expect(screen.getByRole("textbox", { name: "Search clipboard history" })).toHaveFocus();
@@ -75,7 +98,7 @@ describe("history interactions", () => {
     await user.keyboard("{Shift>}");
     await user.click(screen.getByRole("button", { name: "مرحباً English" }));
     await user.keyboard("{/Shift}");
-    expect(screen.getByText("3 selected")).toBeVisible();
+    expect(screen.getByText(/3 selected/)).toBeVisible();
     expect(paste).toHaveBeenCalledTimes(1);
   });
 
@@ -127,7 +150,7 @@ describe("history interactions", () => {
   });
 
   it("renders startup and recovery states without treating them as success", async () => {
-    const actions = { paste: vi.fn(), remove: vi.fn(), pin: vi.fn(), edit: vi.fn(), dismiss: vi.fn() };
+    const actions = { stage: vi.fn(), paste: vi.fn(), remove: vi.fn(), pin: vi.fn(), edit: vi.fn(), dismiss: vi.fn() };
     const retry = vi.fn();
     const view = render(<HistoryWorkspace items={[]} actions={actions} loading />);
     expect(screen.getByRole("status")).toHaveTextContent("Loading");

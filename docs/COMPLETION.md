@@ -130,6 +130,29 @@ database and large-history cases. Test all listed shortcuts, including Ctrl+P an
 
 ## Completion rule
 
+### Launcher and selection update
+
+The popup is 460 × 520 with a 360 × 360 minimum. COSMIC's existing Super+V
+binding pointed to a nonexistent `~/.local/bin/clipboard-history`; that launcher
+is now installed. It forwards to the official Tauri single-instance D-Bus service
+and falls back to the installed binary or this checkout's development binary.
+
+Ctrl+A selects visible filtered entries and stages combined text on the native
+clipboard, allowing Ctrl+V in another app. Delete removes selected entries.
+Text entries export text/plain when dragged. Click, Enter, and Ctrl+Enter invoke
+native clipboard writing, popup hiding, COSMIC focus restoration, and wtype paste.
+Terminal targets use Ctrl+Shift+V. Mixed text/image selections return a useful error.
+
+Verified: 13 frontend tests, frontend build, cargo fmt/check/Clippy with warnings
+denied, and 15 Rust unit tests. Three desktop tests are excluded by default;
+the live COSMIC initialization/shutdown test passed explicitly outside the sandbox.
+The current Tauri development binary compiled and started successfully.
+
+Actual Super+V, external drag/drop, click/Enter paste into Chrome, Cursor, terminal,
+and ordinary/multiline inputs still require desktop acceptance. No connected UI
+automation surface is available. Image capture, settings UI, configurable separator,
+production packaging, and remaining acceptance work are not complete.
+
 Every project-profile feature and every item in the supplied completion specification
 must map to implementation and current verification evidence. Passing repository tests
 alone cannot establish COSMIC focus, global launcher, or paste acceptance.

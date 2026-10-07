@@ -14,6 +14,10 @@ export function HistoryItemRow({ item, active, selected, choose, paste, pin, edi
   const label = item.kind === "text" ? item.text : `Image, ${item.width} by ${item.height}`;
   return <li ref={row} className={`history-item ${active ? "is-active" : ""} ${selected ? "is-selected" : ""}`}>
     <button id={`entry-${item.id}`} className="item-content" aria-label={label} aria-pressed={selected}
+      draggable={item.kind === "text"}
+      onDragStart={(event) => {
+        if (item.kind === "text") { event.dataTransfer.setData("text/plain", item.text); event.dataTransfer.effectAllowed = "copy"; }
+      }}
       onFocus={activate}
       onClick={(event) => {
         choose(event.ctrlKey || event.metaKey, event.shiftKey);

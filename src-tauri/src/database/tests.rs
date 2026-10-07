@@ -228,3 +228,28 @@ fn settings_and_pins_survive_reopen() {
         std::fs::remove_file(path).unwrap();
     });
 }
+
+#[test]
+fn selection_text_follows_history_order_and_rejects_missing_entries() {
+    tauri::async_runtime::block_on(async {
+        let history = memory_history().await;
+        history.capture_text("first synthetic").await.unwrap();
+        history.capture_text("second synthetic").await.unwrap();
+        let items = history.list().await.unwrap();
+        let ids = [items[1].id.clone(), items[0].id.clone()];
+        assert_eq!(
+            history.selected_text(&ids, "\n---\n").await.unwrap(),
+            "second synthetic\n---\nfirst synthetic"
+        );
+        history.set_pinned(&ids[0], true).await.unwrap();
+        assert_eq!(
+            history.selected_text(&ids, "\n").await.unwrap(),
+            "first synthetic\nsecond synthetic"
+        );
+        assert!(history
+            .selected_text(&[uuid::Uuid::new_v4().to_string()], "\n")
+            .await
+            .is_err());
+        assert!(history.selected_text(&[], "\n").await.is_err());
+    });
+}

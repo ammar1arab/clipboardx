@@ -22,6 +22,7 @@ export function useHistory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [capture, setCapture] = useState<CaptureStatus>({ state: "starting" });
+  const [launchCount, setLaunchCount] = useState(0);
   const alive = useRef(false);
   const request = useRef(0);
   const refresh = useCallback(async () => {
@@ -56,6 +57,8 @@ export function useHistory() {
     }
     void bind("history-changed", () => { clearTimeout(timer); timer = setTimeout(() => void refresh(), 40); });
     void bind<CaptureStatus>("capture-status", setCapture);
+    void bind("window-opened", () => { setLaunchCount((value) => value + 1); void refresh(); });
+    void bind("native-error", (failure) => setError(errorMessage(failure)));
     void invoke<CaptureStatus>("get_capture_status").then((status) => { if (!cancelled) setCapture(status); }).catch((failure) => { if (!cancelled) setError(errorMessage(failure)); });
     void refresh();
     return () => { cancelled = true; alive.current = false; ++request.current; clearTimeout(timer); subscriptions.forEach((unsubscribe) => unsubscribe()); };
@@ -66,7 +69,8 @@ export function useHistory() {
     catch (failure) { throw errorMessage(failure); }
   }
   const actions: HistoryActions = {
-    paste: async () => { throw "Native paste is not implemented yet."; },
+    stage: async (ids) => { try { await invoke("stage_selection", { ids }); } catch (failure) { throw errorMessage(failure); } },
+    paste: async (entries) => { try { await invoke("paste_entries", { ids: entries.map((item) => item.id) }); } catch (failure) { throw errorMessage(failure); } },
     dismiss: () => { void invoke("hide_window").catch((failure) => setError(errorMessage(failure))); },
     remove: (ids) => mutate("delete_history", { ids }),
     pin: (id, pinned) => mutate("set_pinned", { id, pinned }),
@@ -76,5 +80,5 @@ export function useHistory() {
     try { await invoke("retry_capture"); await refresh(); }
     catch (failure) { setError(errorMessage(failure)); }
   }
-  return { items, actions, loading, error: error ?? capture.message, retry };
+  return { items, actions, loading, error: error ?? capture.message, retry, launchCount };
 }

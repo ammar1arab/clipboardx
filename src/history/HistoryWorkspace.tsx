@@ -1,27 +1,47 @@
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Clipboard, Search, X, ArrowUpRight, Trash2 } from "lucide-react";
 import { filterItems, selectedItems, type ClipboardItem } from "../domain/clipboard";
 import { useSelection } from "./useSelection";
 import { HistoryItemRow } from "./HistoryItemRow";
 
 export type HistoryActions = {
+  stage: (ids: string[]) => Promise<void>;
   paste: (items: ClipboardItem[]) => Promise<void>;
   remove: (ids: string[]) => Promise<void>;
   pin: (id: string, pinned: boolean) => Promise<void>;
   edit: (id: string, text: string) => Promise<void>;
   dismiss: () => void;
 };
-type Props = { items: ClipboardItem[]; actions: HistoryActions; loading?: boolean; error?: string; retry?: () => void };
+type Props = { items: ClipboardItem[]; actions: HistoryActions; loading?: boolean; error?: string; retry?: () => void; launchCount?: number };
 
-export function HistoryWorkspace({ items, actions, loading, error, retry }: Props) {
+export function HistoryWorkspace({ items, actions, loading, error, retry, launchCount }: Props) {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [staging, setStaging] = useState(false);
+  const [stageReady, setStageReady] = useState(false);
   const search = useRef<HTMLInputElement>(null);
   const visible = useMemo(() => filterItems(items, query), [items, query]);
   const selection = useSelection(visible.map((item) => item.id));
   const active = visible.find((item) => item.id === selection.activeId);
+  const selectedKey = JSON.stringify(selectedItems(visible, selection.selected).map((item) => item.id));
+  const stageQueue = useRef(Promise.resolve());
+  const stage = useRef(actions.stage);
+  stage.current = actions.stage;
+  useEffect(() => { search.current?.focus(); search.current?.select(); }, [launchCount]);
+  useEffect(() => {
+    const ids: string[] = JSON.parse(selectedKey);
+    if (!ids.length) { setStaging(false); setStageReady(false); return; }
+    let cancelled = false;
+    setStaging(true);
+    setStageReady(false);
+    stageQueue.current = stageQueue.current.catch(() => {}).then(() => stage.current(ids));
+    void stageQueue.current.then(() => { if (!cancelled) { setStaging(false); setStageReady(true); } }).catch((failure) => {
+      if (!cancelled) { setStaging(false); setOperationError(typeof failure === "string" ? failure : "Could not copy the selection. Please try again."); }
+    });
+    return () => { cancelled = true; };
+  }, [selectedKey]);
 
   async function run(operation: () => Promise<void>) {
     if (busy) return;
@@ -57,14 +77,15 @@ export function HistoryWorkspace({ items, actions, loading, error, retry }: Prop
       if (selection.selected.size) selection.clear(); else if (query) setQuery(""); else actions.dismiss();
       search.current?.focus(); return;
     }
-    if (inControl) return;
+    if (inControl && !(modifier && ["a", "p", "enter"].includes(event.key.toLowerCase())) && !["Delete", "ArrowDown", "ArrowUp", "F2"].includes(event.key)) return;
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault(); selection.move(event.key === "ArrowDown" ? 1 : -1, event.shiftKey);
+      search.current?.focus();
     } else if (modifier && event.key.toLowerCase() === "a") {
       event.preventDefault(); selection.selectAll();
     } else if (event.key === "Enter") {
       event.preventDefault(); if (modifier) pasteSelected(); else if (active) void run(() => actions.paste([active]));
-    } else if (event.key === "Delete" && (!inSearch || !query)) {
+    } else if (event.key === "Delete" && (selection.selected.size || !inSearch || !query)) {
       event.preventDefault(); removeSelected();
     } else if (event.key === "F2" && active) {
       event.preventDefault(); beginEdit(active);
@@ -82,7 +103,7 @@ export function HistoryWorkspace({ items, actions, loading, error, retry }: Prop
     </div>
     {(error || operationError) && <div className="error-message" role="alert">{error || operationError}{retry && <button onClick={retry}>Retry</button>}</div>}
     {selection.selected.size > 0 && <div className="selection-toolbar" aria-label="Selection actions">
-      <span aria-live="polite">{selection.selected.size} selected</span>
+      <span aria-live="polite">{selection.selected.size} selected{staging ? " · Copying…" : stageReady ? " · Ctrl+V anywhere" : ""}</span>
       <button disabled={busy} onClick={pasteSelected}><ArrowUpRight size={13} /> Paste</button>
       <button disabled={busy} onClick={removeSelected}><Trash2 size={13} /> Delete</button>
       <button className="icon-button" aria-label="Clear selection" onClick={selection.clear}><X size={14} /></button>

@@ -219,6 +219,46 @@ impl History {
         Ok(())
     }
 
+    pub async fn selected_text(&self, ids: &[String], separator: &str) -> Result<String, AppError> {
+        if ids.is_empty() || ids.len() > 10000 || separator.len() > 1024 {
+            return Err("Select 1–10000 entries with a separator of at most 1024 bytes".into());
+        }
+        for id in ids {
+            validate_id(id)?;
+        }
+        let mut query = sqlx::QueryBuilder::<Sqlite>::new(
+            "SELECT kind, text FROM clipboard_items WHERE id IN (",
+        );
+        let mut bindings = query.separated(",");
+        for id in ids {
+            bindings.push_bind(id);
+        }
+        bindings.push_unseparated(") ORDER BY pinned DESC, captured_at DESC, rowid DESC");
+        let rows = query
+            .build()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(database_error)?;
+        if rows.len() != ids.iter().collect::<std::collections::HashSet<_>>().len() {
+            return Err(AppError::not_found());
+        }
+        let mut result = String::new();
+        for row in rows {
+            if row.get::<String, _>("kind") != "text" {
+                return Err("Paste images individually. Multi-paste supports text entries.".into());
+            }
+            let text: String = row.get("text");
+            if !result.is_empty() {
+                result.push_str(separator);
+            }
+            if result.len() + text.len() > 16 * 1024 * 1024 {
+                return Err("Combined clipboard text exceeds the 16 MiB limit".into());
+            }
+            result.push_str(&text);
+        }
+        Ok(result)
+    }
+
     pub async fn list(&self) -> Result<Vec<HistoryItem>, AppError> {
         let mut transaction = self.pool.begin().await.map_err(database_error)?;
         Self::prune(&mut transaction)

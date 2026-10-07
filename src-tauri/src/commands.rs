@@ -82,3 +82,44 @@ pub fn hide_window(window: tauri::WebviewWindow) -> Result<(), AppError> {
         message: "Could not hide ClipboardX. Try again.".into(),
     })
 }
+
+#[tauri::command]
+pub async fn stage_selection(
+    ids: Vec<String>,
+    history: tauri::State<'_, History>,
+    clipboard: tauri::State<'_, crate::clipboard::writer::NativeClipboard>,
+) -> Result<(), AppError> {
+    clipboard
+        .write_text(history.selected_text(&ids, "\n\n").await?)
+        .await
+}
+
+#[tauri::command]
+pub async fn paste_entries(
+    ids: Vec<String>,
+    window: tauri::WebviewWindow,
+    history: tauri::State<'_, History>,
+    clipboard: tauri::State<'_, crate::clipboard::writer::NativeClipboard>,
+    app: tauri::AppHandle,
+) -> Result<(), AppError> {
+    let _operation = clipboard.operation.lock().await;
+    clipboard
+        .write_unlocked(history.selected_text(&ids, "\n\n").await?)
+        .await?;
+    #[cfg(target_os = "linux")]
+    {
+        use tauri::Manager;
+        crate::platform::paste(
+            &window,
+            &app.state::<crate::platform::cosmic::FocusTracker>(),
+        )
+        .await
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (window, app);
+        Err(AppError::from(
+            "Native paste is currently implemented for COSMIC Wayland.",
+        ))
+    }
+}

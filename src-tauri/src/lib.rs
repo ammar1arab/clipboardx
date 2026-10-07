@@ -2,6 +2,7 @@ mod clipboard;
 mod commands;
 mod database;
 mod error;
+mod platform;
 
 use database::History;
 use tauri::Manager;
@@ -9,6 +10,15 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+            if !args.iter().any(|arg| arg == "--background") {
+                if let Err(error) = platform::toggle(app) {
+                    use tauri::Emitter;
+                    let _ = app.emit("native-error", error);
+                    eprintln!("ClipboardX could not toggle its window.");
+                }
+            }
+        }))
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
@@ -22,8 +32,33 @@ pub fn run() {
             let history =
                 tauri::async_runtime::block_on(History::open(&directory.join("history.sqlite")))?;
             app.manage(history);
+            #[cfg(target_os = "linux")]
+            app.manage(platform::cosmic::FocusTracker::start()?);
+            app.manage(clipboard::writer::NativeClipboard::default());
             app.manage(clipboard::CaptureMonitor::start(app.handle().clone())?);
+            #[cfg(not(target_os = "linux"))]
+            {
+                use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+                app.global_shortcut()
+                    .on_shortcut("Super+V", |app, _, event| {
+                        if event.state == ShortcutState::Pressed {
+                            let _ = platform::toggle(app);
+                        }
+                    })?;
+            }
+            if !std::env::args().any(|arg| arg == "--background") {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.show()?;
+                    window.set_focus()?;
+                }
+            }
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::list_history,
@@ -36,13 +71,18 @@ pub fn run() {
             commands::set_retention,
             commands::get_capture_status,
             commands::retry_capture,
-            commands::hide_window
+            commands::hide_window,
+            commands::stage_selection,
+            commands::paste_entries
         ])
         .build(tauri::generate_context!());
     match app {
         Ok(app) => app.run(|handle, event| {
             if let tauri::RunEvent::Exit = event {
                 handle.state::<clipboard::CaptureMonitor>().stop();
+                handle.state::<clipboard::writer::NativeClipboard>().close();
+                #[cfg(target_os = "linux")]
+                handle.state::<platform::cosmic::FocusTracker>().stop();
             }
         }),
         Err(_) => {

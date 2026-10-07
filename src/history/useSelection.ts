@@ -10,7 +10,9 @@ export function useSelection(ids: string[]) {
   function choose(id: string, toggle: boolean, range: boolean) {
     setActive(id);
     if (range) {
-      const start = ids.indexOf(anchor && ids.includes(anchor) ? anchor : activeId ?? id);
+      const origin = anchor && ids.includes(anchor) ? anchor : activeId ?? id;
+      if (!anchor || !ids.includes(anchor)) setAnchor(origin);
+      const start = ids.indexOf(origin);
       const end = ids.indexOf(id);
       setSelection(new Set(ids.slice(Math.min(start, end), Math.max(start, end) + 1)));
     } else if (toggle) {
