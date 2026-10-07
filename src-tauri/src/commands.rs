@@ -139,9 +139,13 @@ pub async fn set_settings(
     let on_top = settings.always_on_top;
     history.set_settings(settings).await?;
     frame.set(width, height);
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.set_always_on_top(on_top);
-    }
+    let window = app.get_webview_window("main");
+    let app_for_ui = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let Some(window) = window {
+            crate::platform::apply_on_top(&app_for_ui, &window, on_top);
+        }
+    });
     Ok(())
 }
 

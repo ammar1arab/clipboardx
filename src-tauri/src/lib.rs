@@ -59,7 +59,7 @@ pub fn run() {
             if !std::env::args().any(|arg| arg == "--background") {
                 if let Some(window) = app.get_webview_window("main") {
                     platform::apply_saved_size(app.handle(), &window);
-                    let _ = window.set_always_on_top(settings.always_on_top);
+                    platform::apply_on_top(app.handle(), &window, settings.always_on_top);
                     window.show()?;
                     window.set_focus()?;
                 }

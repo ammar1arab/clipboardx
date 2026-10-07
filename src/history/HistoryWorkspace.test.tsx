@@ -158,7 +158,7 @@ describe("history interactions", () => {
   it("selects only filtered entries and rejects mixed multi-paste", async () => {
     const { user, paste } = setup();
     await user.keyboard("{Control>}a{Enter}{/Control}");
-    expect(screen.getByRole("alert")).toHaveTextContent("Paste images individually");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(paste).not.toHaveBeenCalled();
     await user.keyboard("{Escape}");
     await user.type(screen.getByRole("textbox"), "Alpha");

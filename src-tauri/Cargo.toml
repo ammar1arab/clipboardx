@@ -43,3 +43,5 @@ wl-clipboard-rs = "0.9.4"
 nix = { version = "0.31.3", features = ["poll"] }
 wayland-client = "0.31.15"
 cosmic-protocols = { version = "0.2.0", default-features = false, features = ["client"] }
+gtk = "0.18"
+libloading = "0.8"

@@ -25,6 +25,90 @@ pub fn apply_saved_size(app: &AppHandle, window: &tauri::WebviewWindow) {
     let _ = window.set_size(tauri::LogicalSize::new(width as f64, height as f64));
 }
 
+pub fn apply_on_top(app: &AppHandle, window: &tauri::WebviewWindow, on_top: bool) {
+    let _ = window.set_always_on_top(on_top);
+    #[cfg(target_os = "linux")]
+    pin_above_wayland(app, window, on_top);
+}
+
+#[cfg(target_os = "linux")]
+fn pin_above_wayland(app: &AppHandle, window: &tauri::WebviewWindow, on_top: bool) {
+    use gtk::glib::object::ObjectType;
+    use gtk::prelude::WidgetExt;
+    use std::ffi::c_void;
+    let Ok(gtk_window) = window.gtk_window() else { return };
+    let Some(layer) = layer_shell() else {
+        return;
+    };
+    let raw = ObjectType::as_ptr(&gtk_window).cast::<c_void>();
+    let layered = unsafe { (layer.is_layer)(raw) != 0 };
+    if on_top {
+        if !layered {
+            let pos = window.outer_position().ok();
+            if gtk_window.is_realized() {
+                gtk_window.hide();
+                gtk_window.unrealize();
+            }
+            unsafe { (layer.init)(raw) };
+            unsafe {
+                (layer.set_anchor)(raw, 0, 1);
+                (layer.set_anchor)(raw, 2, 1);
+            }
+            if let Some(pos) = pos {
+                unsafe {
+                    (layer.set_margin)(raw, 0, pos.x.max(0));
+                    (layer.set_margin)(raw, 2, pos.y.max(0));
+                }
+            }
+        }
+        unsafe {
+            (layer.set_layer)(raw, 3);
+            (layer.set_keyboard)(raw, 2);
+            (layer.set_zone)(raw, 0);
+        }
+        gtk_window.show();
+        let _ = window.show();
+    } else if layered {
+        if let Ok(exe) = std::env::current_exe() {
+            let _ = std::process::Command::new("sh").arg("-c").arg("sleep 0.4; exec \"$0\" \"$@\"").arg(exe).spawn();
+        }
+        app.exit(0);
+    }
+}
+
+#[cfg(target_os = "linux")]
+struct LayerShell {
+    init: unsafe extern "C" fn(*mut std::ffi::c_void),
+    is_layer: unsafe extern "C" fn(*mut std::ffi::c_void) -> i32,
+    set_layer: unsafe extern "C" fn(*mut std::ffi::c_void, i32),
+    set_keyboard: unsafe extern "C" fn(*mut std::ffi::c_void, i32),
+    set_zone: unsafe extern "C" fn(*mut std::ffi::c_void, i32),
+    set_anchor: unsafe extern "C" fn(*mut std::ffi::c_void, i32, i32),
+    set_margin: unsafe extern "C" fn(*mut std::ffi::c_void, i32, i32),
+}
+
+#[cfg(target_os = "linux")]
+fn layer_shell() -> Option<&'static LayerShell> {
+    use std::sync::OnceLock;
+    static LAYER: OnceLock<Option<LayerShell>> = OnceLock::new();
+    LAYER.get_or_init(|| {
+        let lib = unsafe { libloading::Library::new("libgtk-layer-shell.so.0").ok() }?;
+        let shell = unsafe {
+            LayerShell {
+                init: *lib.get(b"gtk_layer_init_for_window\0").ok()?,
+                is_layer: *lib.get(b"gtk_layer_is_layer_window\0").ok()?,
+                set_layer: *lib.get(b"gtk_layer_set_layer\0").ok()?,
+                set_keyboard: *lib.get(b"gtk_layer_set_keyboard_mode\0").ok()?,
+                set_zone: *lib.get(b"gtk_layer_set_exclusive_zone\0").ok()?,
+                set_anchor: *lib.get(b"gtk_layer_set_anchor\0").ok()?,
+                set_margin: *lib.get(b"gtk_layer_set_margin\0").ok()?,
+            }
+        };
+        std::mem::forget(lib);
+        Some(shell)
+    }).as_ref()
+}
+
 pub fn toggle(app: &AppHandle) -> Result<(), AppError> {
     let window = app
         .get_webview_window("main")

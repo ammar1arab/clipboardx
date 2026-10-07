@@ -63,9 +63,7 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
   function pasteSelected() {
     const entries = selectedItems(visible, selection.selected);
     if (!entries.length) return;
-    if (entries.length > 1 && entries.some((item) => item.kind === "image")) {
-      setOperationError("Paste images individually. Multi-paste supports text entries."); return;
-    }
+    if (entries.length > 1 && entries.some((item) => item.kind === "image")) return;
     void run(() => actions.paste(entries));
   }
   function saveEdit() {
