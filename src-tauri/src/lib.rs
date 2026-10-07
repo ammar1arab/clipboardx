@@ -56,10 +56,10 @@ pub fn run() {
                         }
                     })?;
             }
-            if !std::env::args().any(|arg| arg == "--background") {
-                if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_webview_window("main") {
+                platform::apply_on_top(app.handle(), &window, settings.always_on_top, false);
+                if !std::env::args().any(|arg| arg == "--background") {
                     platform::apply_saved_size(app.handle(), &window);
-                    platform::apply_on_top(app.handle(), &window, settings.always_on_top);
                     window.show()?;
                     window.set_focus()?;
                 }

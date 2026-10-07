@@ -143,7 +143,7 @@ pub async fn set_settings(
     let app_for_ui = app.clone();
     let _ = app.run_on_main_thread(move || {
         if let Some(window) = window {
-            crate::platform::apply_on_top(&app_for_ui, &window, on_top);
+            crate::platform::apply_on_top(&app_for_ui, &window, on_top, true);
         }
     });
     Ok(())
