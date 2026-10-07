@@ -33,8 +33,14 @@ This ledger records requirements, not a claim of production readiness.
 - Text is stored in an app-data SQLite database; on Unix its parent directory is mode 0700.
 - Regression tests cover exact text preservation, stable duplicate IDs across reopening,
    and rejected empty, oversized, or NUL-containing payloads.
-- Database operations for edit/delete/pinning and persistent count/age retention are in
-  progress; migrations and their regression tests remain required before milestone 2.
+- Milestone 2 provides versioned transactional migrations, a shared text/image metadata
+  schema, Rust-owned text capture/list/edit/delete/pin/clear operations and persistent
+  count/age retention. Pins survive retention; edits into existing text are rejected
+  without mutating either entry. Clear/delete remain idempotent where appropriate.
+- Nine Rust regression tests pass, including legacy upgrade, repeated migration, rapid
+  recopy promotion, invalid operation atomicity, settings/pin persistence and cleanup.
+  Native commands return `{ code, message }` errors without database/clipboard details.
+  Image insertion and filesystem cleanup will be verified in milestone 4.
 - Clipboard monitoring, images, live history integration, native paste, launcher, settings,
   autostart state, release packaging and hardening remain outstanding.
 

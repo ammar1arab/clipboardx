@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS text_history (
+    id TEXT PRIMARY KEY, text TEXT NOT NULL, digest TEXT NOT NULL UNIQUE,
+    pinned INTEGER NOT NULL DEFAULT 0, captured_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS retention (
+    singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+    max_items INTEGER NOT NULL CHECK(max_items BETWEEN 1 AND 10000),
+    max_age_days INTEGER NOT NULL CHECK(max_age_days BETWEEN 1 AND 3650)
+);
+INSERT OR IGNORE INTO retention VALUES (1, 500, 30);
