@@ -1,51 +1,22 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
+import { HistoryWorkspace } from "./history/HistoryWorkspace";
+import type { ClipboardItem } from "./domain/clipboard";
 import "./App.css";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+const sampleItems: ClipboardItem[] = [
+  { id: "sample-1", kind: "text", text: "Keep the things you copy close at hand.", pinned: true, createdAt: 0, lastUsedAt: null },
+  { id: "sample-2", kind: "text", text: "https://system76.com/cosmic", pinned: false, createdAt: 0, lastUsedAt: null },
+  { id: "sample-3", kind: "text", text: "const greeting = 'Hello, COSMIC';\nconsole.log(greeting);", pinned: false, createdAt: 0, lastUsedAt: null },
+  { id: "sample-4", kind: "text", text: "مرحباً — your clipboard, always nearby", pinned: false, createdAt: 0, lastUsedAt: null },
+];
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
-
-  return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
-  );
+export default function App() {
+  const [items, setItems] = useState(sampleItems);
+  return <HistoryWorkspace items={items} preview actions={{
+    paste: async () => { throw "Native paste is not connected in this interface preview."; },
+    dismiss: () => {},
+    remove: async (ids) => setItems((current) => current.filter((item) => !ids.includes(item.id))),
+    pin: async (id, pinned) => setItems((current) => current.map((item) => item.id === id ? { ...item, pinned } : item)),
+    edit: async (id, text) => setItems((current) => current.map((item) => item.id === id && item.kind === "text" ? { ...item, text } : item)),
+  }} />;
 }
-
-export default App;
