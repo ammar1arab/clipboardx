@@ -1,0 +1,19 @@
+#!/bin/sh
+# Super+V. A replaced or development binary is stopped so the installed app is the one that opens.
+killed=0
+for pid in $(pgrep -x clipboardx 2>/dev/null); do
+  exe=$(readlink "/proc/$pid/exe" 2>/dev/null || true)
+  case "$exe" in
+    /usr/bin/clipboardx) ;;
+    *) kill "$pid" 2>/dev/null || true; killed=1 ;;
+  esac
+done
+if [ "$killed" = 1 ]; then sleep 0.3; fi
+if [ ! -x /usr/bin/clipboardx ]; then
+  echo "ClipboardX is not installed." >&2
+  exit 1
+fi
+if /usr/bin/gdbus call --session --dest com.ammararab.clipboardx.SingleInstance --object-path /com/ammararab/clipboardx/SingleInstance --method org.SingleInstance.DBus.ExecuteCallback "['clipboardx', '--toggle']" "''" >/dev/null 2>&1; then
+  exit 0
+fi
+exec /usr/bin/clipboardx --toggle
