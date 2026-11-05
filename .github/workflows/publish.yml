@@ -169,9 +169,19 @@ jobs:
           gh release edit stable --latest
 
       - uses: actions/configure-pages@v5
+        id: pages
+        continue-on-error: true
+        with:
+          enablement: true
+
+      - name: Download page needs a public repository
+        if: steps.pages.outcome != 'success'
+        run: echo "::warning::GitHub Pages is unavailable on the current plan while this repository is private. The installers are on the stable release."
 
       - uses: actions/upload-pages-artifact@v3
+        if: steps.pages.outcome == 'success'
         with:
           path: site
 
       - uses: actions/deploy-pages@v4
+        if: steps.pages.outcome == 'success'
