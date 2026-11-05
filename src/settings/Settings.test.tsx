@@ -14,7 +14,8 @@ test("shows load errors with a working Retry instead of loading forever", async 
   const user = userEvent.setup();
   render(<Settings close={vi.fn()} />);
   expect(await screen.findByRole("alert")).toHaveTextContent("Command get_settings not found");
-  expect(screen.queryByText("Loading settings…")).not.toBeInTheDocument();
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Width")).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Retry" }));
   expect(await screen.findByLabelText("Paste separator")).toBeVisible();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -27,6 +28,7 @@ test("loads real preferences, saves them, and clears all history immediately", a
   const user = userEvent.setup();
   render(<Settings close={vi.fn()} />);
   const separator = await screen.findByLabelText("Paste separator");
+  await waitFor(() => expect(separator).toHaveValue(" | "));
   expect(screen.getByLabelText("Start at login")).toBeChecked();
   expect(screen.getByLabelText("Stage selection for Ctrl+V")).toBeChecked();
   expect(screen.getByLabelText("Show shortcut bar")).toBeChecked();

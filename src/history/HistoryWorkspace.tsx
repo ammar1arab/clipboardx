@@ -6,8 +6,6 @@ import { ShortcutList } from "../shortcuts";
 import { useSelection } from "./useSelection";
 import { HistoryItemRow } from "./HistoryItemRow";
 
-export const MIXED_PASTE = "Select one image, or only text, to paste them together.";
-
 export type HistoryActions = {
   stage: (ids: string[]) => Promise<void>;
   paste: (items: ClipboardItem[]) => Promise<void>;
@@ -59,10 +57,9 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
   visibleItems.current = visible;
   function publishStage(token: string) {
     const ids: string[] = JSON.parse(token.slice(token.indexOf(":") + 1));
-    const clearMixed = () => setOperationError((current) => current === MIXED_PASTE ? null : current);
-    if (!ids.length || !token.startsWith("true:")) { setStaging(false); setStageReady(false); clearMixed(); return; }
+    if (!ids.length || !token.startsWith("true:")) { setStaging(false); setStageReady(false); return; }
     const chosen = selectedItems(visibleItems.current, new Set(ids));
-    if (mixed(chosen)) { setStaging(false); setStageReady(false); setOperationError(MIXED_PASTE); return; }
+    if (mixed(chosen)) { setStaging(false); setStageReady(false); return; }
     const ticket = ++stageTicket.current;
     setStaging(true);
     setStageReady(false);
@@ -70,7 +67,6 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
     void stageQueue.current.then(() => {
       if (ticket !== stageTicket.current) return;
       setStaging(false); setStageReady(true);
-      setOperationError((current) => current === MIXED_PASTE ? null : current);
     }).catch((failure) => {
       if (ticket !== stageTicket.current) return;
       setStaging(false);
@@ -106,11 +102,15 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
     const ids = selection.selected.size ? [...selection.selected] : active ? [active.id] : [];
     if (ids.length) void run(async () => { await actions.remove(ids); selection.clear(); });
   }
-  function pasteSelected() {
-    const entries = selectedItems(visible, selection.selected);
+  function pasteEntries(entries: ClipboardItem[]) {
     if (!entries.length) return;
-    if (mixed(entries)) { setOperationError(MIXED_PASTE); return; }
+    if (mixed(entries)) return;
+    search.current?.blur();
+    workspace.current?.focus();
     void run(() => actions.paste(entries));
+  }
+  function pasteSelected() {
+    pasteEntries(selectedItems(visible, selection.selected));
   }
   function saveEdit() {
     if (editing) void run(async () => { await actions.edit(editing.id, editing.text); flushSync(() => setEditing(null)); workspace.current?.focus(); });
@@ -121,6 +121,10 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
   }
   function onKeyDown(event: KeyboardEvent<HTMLElement>) {
     if (editing) return;
+    if ((busy || operationRunning.current) && (event.key.length === 1 || event.key === "Enter")) {
+      event.preventDefault();
+      return;
+    }
     const target = event.target as HTMLElement;
     const inSearch = target === search.current;
     const inControl = Boolean(target.closest("button, input, textarea, select") && !inSearch && !target.closest(".item-content"));
@@ -155,7 +159,7 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
       event.preventDefault();
       if (selection.activeId) selection.choose(selection.activeId, true, false);
     } else if (event.key === "Enter") {
-      event.preventDefault(); if (modifier || selection.selected.size) pasteSelected(); else if (active) void run(() => actions.paste([active]));
+      event.preventDefault(); if (modifier || selection.selected.size) pasteSelected(); else if (active) pasteEntries([active]);
     } else if ((event.key === "Delete" || event.key === "Backspace") && !inSearch) {
       event.preventDefault(); removeSelected();
     } else if (event.key === "F2" && active) {
@@ -183,8 +187,8 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
     {banner && <div className="error-message" role="alert">{banner}{showRetry && <button onClick={retry}>Retry</button>}</div>}
     {selection.selected.size > 0 && <div className="selection-toolbar" aria-label="Selection actions">
       <span aria-live="polite">{selection.selected.size} selected{staging ? " · Copying…" : stageReady ? " · Ctrl+V anywhere" : ""}</span>
-      <button disabled={busy} onClick={pasteSelected}><ArrowUpRight size={13} /> Paste</button>
-      <button disabled={busy} onClick={removeSelected}><Trash2 size={13} /> Delete</button>
+      <button className="selection-action" disabled={busy} onClick={pasteSelected}><ArrowUpRight size={11} /> Paste</button>
+      <button className="selection-action" disabled={busy} onClick={removeSelected}><Trash2 size={11} /> Delete</button>
       <button className="icon-button" aria-label="Clear selection" onClick={selection.clear}><X size={14} /></button>
     </div>}
     <div className="history-scroll">
@@ -208,7 +212,7 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
             <div className="editor-actions"><span>Shift+Enter for a new line</span><button onClick={() => { flushSync(() => setEditing(null)); workspace.current?.focus(); }}>Cancel</button><button disabled={busy || !editing.text} onClick={saveEdit}>Save</button></div>
           </li> : <HistoryItemRow key={item.id} item={item} active={selection.activeId === item.id} selected={selection.selected.has(item.id)} fresh={freshIds.has(item.id)}
             activate={() => selection.activate(item.id)}
-            choose={(toggle, range) => selection.choose(item.id, toggle, range)} paste={() => void run(() => actions.paste([item]))}
+            choose={(toggle, range) => selection.choose(item.id, toggle, range)} paste={() => pasteEntries([item])}
             pin={() => void run(() => actions.pin(item.id, !item.pinned))} edit={() => beginEdit(item)} remove={() => void run(() => actions.remove([item.id]))} />)}
         </ul>}
     </div>

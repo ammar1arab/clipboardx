@@ -52,6 +52,20 @@ pub fn toggle(app: &AppHandle) -> Result<(), AppError> {
 
 #[cfg(all(test, target_os = "linux"))]
 mod tests {
+    use super::paste_chord;
+
+    #[test]
+    fn paste_chord_holds_ctrl_before_v() {
+        let editor = paste_chord(false);
+        let terminal = paste_chord(true);
+        assert_eq!(&editor[..6], &["-M", "ctrl", "-s", "40", "-k", "v"]);
+        assert!(editor.ends_with(&["-m", "ctrl"]));
+        assert!(terminal
+            .windows(4)
+            .any(|part| part == ["-M", "shift", "-s", "40"]));
+        assert!(terminal.contains(&"-m") && terminal.contains(&"shift"));
+    }
+
     use wayland_client::{protocol::wl_registry, Connection, Dispatch, QueueHandle};
     #[derive(Default)]
     struct Protocols(Vec<String>);
@@ -89,6 +103,34 @@ mod tests {
 }
 
 #[cfg(target_os = "linux")]
+fn paste_chord(terminal: bool) -> &'static [&'static str] {
+    if terminal {
+        &[
+            "-M", "ctrl", "-M", "shift", "-s", "40", "-k", "v", "-s", "20", "-m", "shift", "-m",
+            "ctrl",
+        ]
+    } else {
+        &[
+            "-M", "ctrl", "-s", "40", "-k", "v", "-s", "20", "-m", "ctrl",
+        ]
+    }
+}
+
+#[cfg(target_os = "linux")]
+async fn keyboard_left(window: &tauri::WebviewWindow) -> bool {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(350);
+    loop {
+        if !window.is_focused().unwrap_or(false) {
+            return true;
+        }
+        if std::time::Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(15));
+    }
+}
+
+#[cfg(target_os = "linux")]
 pub async fn paste(
     window: &tauri::WebviewWindow,
     focus: &cosmic::FocusTracker,
@@ -99,9 +141,16 @@ pub async fn paste(
     })?;
     let result = async {
         let terminal = focus.restore().await?;
+        if !keyboard_left(window).await {
+            return Err(AppError {
+                code: "paste_error",
+                message: "The previous app did not take the keyboard. The item remains on the clipboard.".into(),
+            });
+        }
+        let keys = paste_chord(terminal);
         tauri::async_runtime::spawn_blocking(move || {
             use std::{process::{Command, Stdio}, time::{Duration, Instant}};
-            let keys: &[&str] = if terminal { &["-M", "ctrl", "-M", "shift", "-k", "v", "-m", "shift", "-m", "ctrl"] } else { &["-M", "ctrl", "-k", "v", "-m", "ctrl"] };
+            std::thread::sleep(Duration::from_millis(30));
             let error = || AppError { code: "paste_error", message: "Native paste failed. Ensure wtype is installed and virtual-keyboard support is available. The item remains on the clipboard.".into() };
             let mut process = Command::new("wtype").args(keys).stdout(Stdio::null()).stderr(Stdio::null()).spawn().map_err(|_| error())?;
             let deadline = Instant::now() + Duration::from_secs(2);

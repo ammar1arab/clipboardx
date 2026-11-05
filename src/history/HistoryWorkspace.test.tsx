@@ -168,11 +168,10 @@ describe("history interactions", () => {
     expect(paste).toHaveBeenCalledTimes(1);
   });
 
-  it("selects only filtered entries and explains mixed multi-paste", async () => {
+  it("selects only filtered entries and skips mixed multi-paste", async () => {
     const { user, paste, stage } = setup();
     await user.keyboard("{Control>}a{Enter}{/Control}");
-    expect(screen.getByRole("alert")).toHaveTextContent("Select one image, or only text, to paste them together.");
-    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(paste).not.toHaveBeenCalled();
     expect(stage).not.toHaveBeenCalled();
     await user.keyboard("{Escape}");

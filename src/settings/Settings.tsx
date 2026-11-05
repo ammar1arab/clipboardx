@@ -21,6 +21,12 @@ function separatorPreset(value: string) {
   return separatorPresets.find(([, , preset]) => preset === value)?.[0] ?? "custom";
 }
 
+const settingsFallback: Loaded = {
+  preferences: normalizePreferences(undefined),
+  retention: { maxItems: 500, maxAgeDays: 30 },
+  autostart: false,
+};
+
 function SettingsForm({ close }: { close: () => void }) {
   const loadedQuery = useQuery({
     queryKey: ["settings"],
@@ -32,10 +38,12 @@ function SettingsForm({ close }: { close: () => void }) {
       ]);
       return { preferences: normalizePreferences(preferences), retention, autostart };
     },
+    placeholderData: settingsFallback,
   });
-  const [draft, setDraft] = useState<Loaded>();
+  const [draft, setDraft] = useState<Loaded>(settingsFallback);
   const [seen, setSeen] = useState<Loaded>();
-  if (loadedQuery.data && loadedQuery.data !== seen) { setSeen(loadedQuery.data); setDraft(loadedQuery.data); }
+  const settled = loadedQuery.isSuccess && !loadedQuery.isPlaceholderData;
+  if (settled && loadedQuery.data && loadedQuery.data !== seen) { setSeen(loadedQuery.data); setDraft(loadedQuery.data); }
   const operationRunning = useRef(false);
   const doneTimer = useRef<number | undefined>(undefined);
   const [busy, setBusy] = useState(false);
@@ -53,7 +61,6 @@ function SettingsForm({ close }: { close: () => void }) {
   const preferences = draft?.preferences;
   const retention = draft?.retention;
   const autostart = draft?.autostart ?? false;
-  const loaded = Boolean(preferences && retention);
   const error = actionError ?? (loadedQuery.error ? errorMessage(loadedQuery.error) : undefined);
   async function run(action: () => Promise<void>, doneId?: string) {
     if (operationRunning.current) return;
@@ -81,8 +88,8 @@ function SettingsForm({ close }: { close: () => void }) {
         {shortcutsOpen && <div className="shortcut-popover" role="dialog" aria-label="Shortcuts"><ShortcutList /></div>}
       </div>
     </header>
-    {error && <div className="error-message" role="alert">{error}{!loaded && <button onClick={() => void loadedQuery.refetch()}>Retry</button>}</div>}
-    {!loaded ? !error && <div role="status">Loading settings…</div> : preferences && retention && <form className="settings-form" onSubmit={(event) => {
+    {error && <div className="error-message" role="alert">{error}{!loadedQuery.isSuccess && <button onClick={() => void loadedQuery.refetch()}>Retry</button>}</div>}
+    {preferences && retention && <form className="settings-form" onSubmit={(event) => {
       event.preventDefault(); void run(async () => { await invoke("set_retention", { retention }); await invoke("set_settings", { settings: preferences }); }, "save");
     }}>
       <div className="settings-grid">
@@ -91,7 +98,7 @@ function SettingsForm({ close }: { close: () => void }) {
         <label>History limit<input type="number" min={1} max={10000} required value={retention.maxItems} onChange={(event) => setDraft({ ...draft!, retention: { ...retention, maxItems: Number(event.target.value) }, preferences, autostart })} /></label>
         <label>Keep for days<input type="number" min={1} max={3650} required value={retention.maxAgeDays} onChange={(event) => setDraft({ ...draft!, retention: { ...retention, maxAgeDays: Number(event.target.value) }, preferences, autostart })} /></label>
         <label className="setting-toggle"><span>Capture images</span><span className="check"><input type="checkbox" checked={preferences.captureImages} onChange={(event) => setDraft({ ...draft!, preferences: { ...preferences, captureImages: event.target.checked }, retention, autostart })} /></span></label>
-        <label className="setting-toggle"><span>Start at login</span><span className="check"><input type="checkbox" disabled={busy} checked={autostart} onChange={() => void run(async () => { if (autostart) await disable(); else await enable(); setDraft({ ...draft!, preferences, retention, autostart: await isEnabled() }); })} /></span></label>
+        <label className="setting-toggle"><span>Start at login</span><span className="check"><input type="checkbox" disabled={busy || !settled} checked={autostart} onChange={() => void run(async () => { if (autostart) await disable(); else await enable(); setDraft({ ...draft!, preferences, retention, autostart: await isEnabled() }); })} /></span></label>
         <label className="setting-toggle"><span>Stage selection for Ctrl+V</span><span className="check"><input type="checkbox" checked={preferences.stageSelection} onChange={(event) => setDraft({ ...draft!, preferences: { ...preferences, stageSelection: event.target.checked }, retention, autostart })} /></span></label>
         <label className="setting-toggle"><span>Show shortcut bar</span><span className="check"><input type="checkbox" checked={preferences.showShortcutBar} onChange={(event) => setDraft({ ...draft!, preferences: { ...preferences, showShortcutBar: event.target.checked }, retention, autostart })} /></span></label>
         <label className="settings-span">Separator style<select aria-label="Separator style" value={separatorPreset(preferences.pasteSeparator)} onChange={(event) => {
@@ -105,7 +112,7 @@ function SettingsForm({ close }: { close: () => void }) {
       </div>
       <div className="settings-footer">
         <div className="settings-actions">
-          <button className={done === "save" ? "is-done" : undefined} disabled={busy} type="submit">{done === "save" && <Check size={14} aria-hidden="true" />} Save settings</button>
+          <button className={done === "save" ? "is-done" : undefined} disabled={busy || !settled} type="submit">{done === "save" && <Check size={14} aria-hidden="true" />} Save settings</button>
           <button className={`quit-button${done === "quit" ? " is-done" : ""}`} disabled={busy} type="button" onClick={() => void run(async () => { await invoke("quit_app"); }, "quit")}>{done === "quit" && <Check size={14} aria-hidden="true" />} Quit</button>
         </div>
         <div className="settings-actions">
