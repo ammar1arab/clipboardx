@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Download ClipboardX</title>
+    <meta
+      name="description"
+      content="Download ClipboardX. Private clipboard history for Windows, Mac, and Linux."
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --surface: #202226;
+        --raised: #292c31;
+        --line: #3a3e45;
+        --ink: #f0f1f3;
+        --muted: #acb1bb;
+        --accent: #adc9ff;
+        font-family: Inter, "Noto Sans", system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--surface);
+        color: var(--ink);
+        display: grid;
+        place-items: center;
+        padding: 32px 20px;
+      }
+      main { width: min(440px, 100%); }
+      h1 { margin: 0; font-size: 28px; letter-spacing: -0.4px; }
+      .lead { margin: 10px 0 0; color: var(--muted); line-height: 1.5; }
+      .download {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        margin-top: 28px;
+        border-radius: 16px;
+        background: var(--accent);
+        color: #1a1c20;
+        font-weight: 650;
+        text-decoration: none;
+      }
+      .download:focus-visible { outline: 2px solid white; outline-offset: 3px; }
+      .download[aria-disabled="true"] { opacity: 0.7; pointer-events: none; }
+      ol { margin: 22px 0 0; padding-left: 18px; line-height: 1.55; }
+      .others { margin: 28px 0 0; color: var(--muted); line-height: 1.6; }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>ClipboardX</h1>
+      <p class="lead">Private clipboard history. What you copy stays on this computer.</p>
+      <a class="download" id="download" href="https://github.com/ammar1arab/clipboardx/releases/latest/download/ClipboardX-Setup.exe">Download for Windows</a>
+      <ol id="steps">
+        <li>Open the downloaded ClipboardX-Setup.exe.</li>
+        <li>If Windows asks, choose More info, then Run anyway.</li>
+        <li>Choose Next, then Install.</li>
+        <li>Open ClipboardX from the Start menu.</li>
+      </ol>
+      <p class="others">
+        Also available for
+        <a href="https://github.com/ammar1arab/clipboardx/releases/latest/download/ClipboardX.dmg">Mac</a>
+        and
+        <a href="https://github.com/ammar1arab/clipboardx/releases/latest/download/ClipboardX.deb">Linux</a>.
+      </p>
+    </main>
+    <script>
+      const releases = "https://github.com/ammar1arab/clipboardx/releases/latest/download/";
+      const systems = {
+        windows: {
+          file: "ClipboardX-Setup.exe",
+          label: "Download for Windows",
+          steps: [
+            "Open the downloaded ClipboardX-Setup.exe.",
+            "If Windows asks, choose More info, then Run anyway.",
+            "Choose Next, then Install.",
+            "Open ClipboardX from the Start menu."
+          ]
+        },
+        mac: {
+          file: "ClipboardX.dmg",
+          label: "Download for Mac",
+          steps: [
+            "Open the downloaded ClipboardX.dmg.",
+            "Drag ClipboardX onto Applications.",
+            "Open ClipboardX from Applications. If the Mac asks, Control-click the app and choose Open."
+          ]
+        },
+        linux: {
+          file: "ClipboardX.deb",
+          label: "Download for Linux",
+          steps: [
+            "Open the downloaded ClipboardX.deb and install it.",
+            "Open ClipboardX once and turn on Start at login.",
+            "On COSMIC, bind Super+V to the command clipboardx."
+          ]
+        },
+        phone: {
+          file: "",
+          label: "Open this page on a computer",
+          steps: ["ClipboardX installs on Windows, Mac, and Linux."]
+        }
+      };
+      const agent = navigator.userAgent || "";
+      const platform = navigator.platform || "";
+      const name = /iPhone|iPad|iPod|Android/i.test(agent)
+        ? "phone"
+        : /Mac/i.test(platform) || /Macintosh/i.test(agent)
+          ? "mac"
+          : /Win/i.test(platform) || /Windows/i.test(agent)
+            ? "windows"
+            : /Linux/i.test(platform) || /Linux/i.test(agent)
+              ? "linux"
+              : "windows";
+      const system = systems[name];
+      const download = document.querySelector("#download");
+      const steps = document.querySelector("#steps");
+      download.textContent = system.label;
+      if (system.file) download.href = releases + system.file;
+      else download.setAttribute("aria-disabled", "true");
+      steps.replaceChildren(...system.steps.map((text) => {
+        const item = document.createElement("li");
+        item.textContent = text;
+        return item;
+      }));
+    </script>
+  </body>
+</html>

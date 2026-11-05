@@ -4,13 +4,9 @@ A small, private clipboard history for the COSMIC desktop. Press Super+V, find w
 
 ## Install
 
-Copy `ClipboardX_0.1.0_amd64.deb` to the other computer. Do not compile there. Install takes seconds:
+Open [the download page](https://ammar1arab.github.io/clipboardx/) and run the file it gives you.
 
-```bash
-sudo apt install ./ClipboardX_0.1.0_amd64.deb wtype
-```
-
-Open ClipboardX once. In the gear, turn on **Start at login**. On COSMIC, bind Super+V to the command `clipboardx` under Settings → Keyboard → Custom Shortcuts.
+Windows opens a setup window. Choose Next, then Install. Mac opens a window where you drag ClipboardX into Applications. Linux downloads a `.deb` package. On COSMIC, open ClipboardX once, turn on **Start at login** in the gear, and bind Super+V to the command `clipboardx` under Settings → Keyboard → Custom Shortcuts.
 
 Closing the window hides it and keeps capture running. **Quit ClipboardX** in Settings is what stops it.
 

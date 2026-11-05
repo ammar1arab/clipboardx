@@ -34,9 +34,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "deb"
-    ],
+    "publisher": "ClipboardX",
+    "homepage": "https://ammar1arab.github.io/clipboardx/",
+    "targets": ["deb", "nsis", "dmg"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -52,6 +52,17 @@
         "depends": [
           "wtype"
         ]
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "hardenedRuntime": true
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false,
+        "languages": ["English"]
       }
     }
   }
