@@ -22,6 +22,8 @@ pub struct Settings {
     pub paste_separator: String,
     pub window_width: u32,
     pub window_height: u32,
+    pub stage_selection: bool,
+    pub show_shortcut_bar: bool,
 }
 
 fn validate_text(text: &str) -> Result<(), AppError> {
@@ -245,7 +247,7 @@ impl History {
 
     pub async fn settings(&self) -> Result<Settings, AppError> {
         let row = sqlx::query(
-            "SELECT capture_images, paste_separator, window_width, window_height FROM preferences WHERE singleton = 1",
+            "SELECT capture_images, paste_separator, window_width, window_height, stage_selection, show_shortcut_bar FROM preferences WHERE singleton = 1",
         )
         .fetch_one(&self.pool)
         .await
@@ -255,6 +257,8 @@ impl History {
             paste_separator: row.get("paste_separator"),
             window_width: row.get("window_width"),
             window_height: row.get("window_height"),
+            stage_selection: row.get("stage_selection"),
+            show_shortcut_bar: row.get("show_shortcut_bar"),
         })
     }
 
@@ -262,16 +266,20 @@ impl History {
         if settings.paste_separator.len() > 1024 || settings.paste_separator.contains('\0') {
             return Err("Paste separator must be at most 1024 bytes without NUL characters".into());
         }
-        if !(360..=4096).contains(&settings.window_width) || !(360..=4096).contains(&settings.window_height) {
+        if !(360..=4096).contains(&settings.window_width)
+            || !(360..=4096).contains(&settings.window_height)
+        {
             return Err("Window width and height must be between 360 and 4096.".into());
         }
         sqlx::query(
-            "UPDATE preferences SET capture_images = ?, paste_separator = ?, window_width = ?, window_height = ? WHERE singleton = 1",
+            "UPDATE preferences SET capture_images = ?, paste_separator = ?, window_width = ?, window_height = ?, stage_selection = ?, show_shortcut_bar = ? WHERE singleton = 1",
         )
         .bind(settings.capture_images)
         .bind(settings.paste_separator)
         .bind(settings.window_width)
         .bind(settings.window_height)
+        .bind(settings.stage_selection)
+        .bind(settings.show_shortcut_bar)
         .execute(&self.pool)
         .await
         .map_err(database_error)?;
@@ -317,7 +325,7 @@ impl History {
         let mut result = String::new();
         for row in rows {
             if row.get::<String, _>("kind") != "text" {
-                return Err("Paste images individually. Multi-paste supports text entries.".into());
+                return Err("Select one image, or only text, to paste them together.".into());
             }
             let text: String = row.get("text");
             if !result.is_empty() {

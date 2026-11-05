@@ -265,6 +265,8 @@ fn preferences_persist_and_invalid_separator_is_atomic() {
                 paste_separator: " | ".into(),
                 window_width: 800,
                 window_height: 640,
+                stage_selection: false,
+                show_shortcut_bar: false,
             })
             .await
             .unwrap();
@@ -274,6 +276,8 @@ fn preferences_persist_and_invalid_separator_is_atomic() {
                 paste_separator: "x".repeat(1025),
                 window_width: 800,
                 window_height: 640,
+                stage_selection: true,
+                show_shortcut_bar: true,
             })
             .await
             .is_err());
@@ -283,6 +287,8 @@ fn preferences_persist_and_invalid_separator_is_atomic() {
                 paste_separator: " | ".into(),
                 window_width: 200,
                 window_height: 640,
+                stage_selection: true,
+                show_shortcut_bar: true,
             })
             .await
             .is_err());
@@ -292,6 +298,8 @@ fn preferences_persist_and_invalid_separator_is_atomic() {
         assert!(!settings.capture_images);
         assert_eq!(settings.paste_separator, " | ");
         assert_eq!((settings.window_width, settings.window_height), (800, 640));
+        assert!(!settings.stage_selection);
+        assert!(!settings.show_shortcut_bar);
         reopened.pool.close().await;
         std::fs::remove_file(path).unwrap();
     });

@@ -43,13 +43,16 @@ function setup() {
 const menuFor = (name: string) => within(screen.getByRole("button", { name }).closest("li")!).getByRole("button", { name: "More actions" });
 
 describe("history interactions", () => {
-  it("stages the full selection for external Ctrl+V and deletes a filtered selection", async () => {
+  it("stages text selections for external Ctrl+V and deletes a filtered selection", async () => {
     const { user, stage } = setup();
+    await user.click(screen.getByRole("button", { name: "Show text" }));
     await user.keyboard("{Control>}a{/Control}");
-    await waitFor(() => expect(stage).toHaveBeenCalledWith(["a", "b", "c", "d"]));
+    await waitFor(() => expect(stage).toHaveBeenCalledWith(["a", "b", "c"]));
     await screen.findByText(/Ctrl\+V anywhere/);
     await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "Show text" }));
     await user.type(screen.getByRole("textbox"), "Alpha");
+    screen.getByRole("main").focus();
     await user.keyboard("{Control>}a{/Control}{Delete}");
     expect(screen.getByText("No matching entries")).toBeVisible();
     await user.keyboard("{Escape}");
@@ -165,13 +168,16 @@ describe("history interactions", () => {
     expect(paste).toHaveBeenCalledTimes(1);
   });
 
-  it("selects only filtered entries and rejects mixed multi-paste", async () => {
-    const { user, paste } = setup();
+  it("selects only filtered entries and explains mixed multi-paste", async () => {
+    const { user, paste, stage } = setup();
     await user.keyboard("{Control>}a{Enter}{/Control}");
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Select one image, or only text, to paste them together.");
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
     expect(paste).not.toHaveBeenCalled();
+    expect(stage).not.toHaveBeenCalled();
     await user.keyboard("{Escape}");
     await user.type(screen.getByRole("textbox"), "Alpha");
+    screen.getByRole("main").focus();
     await user.keyboard("{Control>}a{Enter}{/Control}");
     expect(paste.mock.calls[0][0].map((item: ClipboardItem) => item.id)).toEqual(["a"]);
   });
@@ -215,6 +221,57 @@ describe("history interactions", () => {
     expect(screen.queryByRole("textbox", { name: "Edit clipboard text" })).not.toBeInTheDocument();
     await user.keyboard("{Escape}");
     expect(dismiss).toHaveBeenCalledOnce();
+  });
+
+  it("keeps Ctrl+A and Delete inside the search box", async () => {
+    const { user, paste } = setup();
+    const search = screen.getByRole("textbox", { name: "Search clipboard history" });
+    await user.type(search, "Alpha");
+    await user.keyboard("{Control>}a{/Control}{Delete}");
+    expect(search).toHaveValue("");
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
+    expect(paste).not.toHaveBeenCalled();
+  });
+
+  it("toggles with Space, jumps with End, and pastes the selection on Enter", async () => {
+    const { user, paste } = setup();
+    await user.keyboard(" ");
+    expect(screen.getByText(/1 selected/)).toBeVisible();
+    expect(paste).not.toHaveBeenCalled();
+    await user.keyboard("{Enter}");
+    expect(paste.mock.calls[0][0].map((item: ClipboardItem) => item.id)).toEqual(["a"]);
+    await user.keyboard("{End}");
+    expect(screen.getByRole("button", { name: "Image, 400 by 200" }).closest("li")).toHaveClass("is-active");
+  });
+
+  it("extends to the ends, filters from the keyboard, and opens shortcuts", async () => {
+    const { user, dismiss } = setup();
+    await user.keyboard("{Shift>}{End}{/Shift}");
+    expect(screen.getByText(/4 selected/)).toBeVisible();
+    await user.keyboard("{Escape}");
+    await user.keyboard("{Alt>}2{/Alt}");
+    expect(screen.getByRole("button", { name: "Show text" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    await user.keyboard("{Control>}/{/Control}");
+    expect(screen.getByRole("dialog", { name: "Shortcuts" })).toBeVisible();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Shortcuts" })).not.toBeInTheDocument();
+    expect(dismiss).not.toHaveBeenCalled();
+  });
+
+  it("does not stage a selection when that setting is off", async () => {
+    const stage = vi.fn().mockResolvedValue(undefined);
+    const paste = vi.fn().mockResolvedValue(undefined);
+    const actions = { stage, paste, remove: vi.fn(), pin: vi.fn(), edit: vi.fn(), dismiss: vi.fn() };
+    render(<HistoryWorkspace items={fixtures.filter((item) => item.kind === "text")} actions={actions} stageSelection={false} showShortcutBar={false} />);
+    const user = userEvent.setup();
+    await user.keyboard("{Control>}a{/Control}");
+    expect(screen.getByText(/3 selected/)).toBeVisible();
+    expect(screen.queryByText(/Ctrl\+V anywhere/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/range/)).not.toBeInTheDocument();
+    expect(stage).not.toHaveBeenCalled();
+    await user.keyboard("{Enter}");
+    expect(paste.mock.calls[0][0].map((item: ClipboardItem) => item.id)).toEqual(["a", "b", "c"]);
   });
 
   it("renders startup and recovery states without treating them as success", async () => {

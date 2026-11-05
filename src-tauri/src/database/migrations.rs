@@ -6,7 +6,14 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (3, include_str!("../../migrations/0003_settings.sql")),
     (4, include_str!("../../migrations/0004_window_size.sql")),
     (5, include_str!("../../migrations/0005_window_mode.sql")),
-    (6, include_str!("../../migrations/0006_drop_window_mode.sql")),
+    (
+        6,
+        include_str!("../../migrations/0006_drop_window_mode.sql"),
+    ),
+    (
+        7,
+        include_str!("../../migrations/0007_selection_preferences.sql"),
+    ),
 ];
 
 pub(super) async fn run(pool: &SqlitePool) -> Result<(), sqlx::Error> {

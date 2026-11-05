@@ -19,7 +19,7 @@ use wl_clipboard_rs::{
 const MAX_TEXT_BYTES: usize = 1024 * 1024;
 const READ_DEADLINE: Duration = Duration::from_secs(2);
 
-fn image_mime<'a>(types: &'a [String]) -> Option<&'a str> {
+fn image_mime(types: &[String]) -> Option<&str> {
     [
         "image/png",
         "image/x-png",
@@ -174,8 +174,12 @@ pub(super) fn watch(
                 loop {
                     if stop.load(Ordering::Acquire) { break; }
                     match watcher.next_event() {
-                        Ok(Some(ClipboardEvent::Changed { clipboard, mime_types, mut offer, .. }))
-                            if clipboard == wl_clipboard_rs::paste::ClipboardType::Primary =>
+                        Ok(Some(ClipboardEvent::Changed {
+                            clipboard: wl_clipboard_rs::paste::ClipboardType::Primary,
+                            mime_types,
+                            mut offer,
+                            ..
+                        })) =>
                         {
                             if startup_primary(&mut saw_primary) { continue; }
                             if !focused_terminal(&app) { continue; }
@@ -199,10 +203,24 @@ pub(super) fn watch(
                             let result = offer.receive(mime).map_err(|_| "Could not receive clipboard contents. Copy again.")
                                 .and_then(|reader| read_bytes(reader, &stop, if image_mime.is_some() { 64 * 1024 * 1024 } else { MAX_TEXT_BYTES }, if image_mime.is_some() { Duration::from_secs(8) } else { READ_DEADLINE }));
                             let saved = match result {
-                                Ok(bytes) if image_mime.is_some() => tauri::async_runtime::block_on(history.capture_image(bytes)).map_err(|_| "Could not save image. Check image limits and storage."),
+                                Ok(bytes) if image_mime.is_some() => {
+                                    if let Ok(hash) = crate::images::encoded_rgba_hash(&bytes) {
+                                        if app.try_state::<super::OwnWrites>().is_some_and(|writes| writes.suppress_image(&hash)) {
+                                            publish_status(&app, &status, CaptureStatus::Running);
+                                            continue;
+                                        }
+                                    }
+                                    tauri::async_runtime::block_on(history.capture_image(bytes)).map_err(|_| "Could not save image. Check image limits and storage.")
+                                }
                                 Ok(bytes) => match String::from_utf8(bytes) {
                                     Ok(text) if text.is_empty() => Ok(()),
-                                    Ok(text) => tauri::async_runtime::block_on(history.capture_text(&text)).map_err(|_| "Could not save clipboard text. Check storage."),
+                                    Ok(text) => {
+                                        if app.try_state::<super::OwnWrites>().is_some_and(|writes| writes.suppress_text(&text)) {
+                                            publish_status(&app, &status, CaptureStatus::Running);
+                                            continue;
+                                        }
+                                        tauri::async_runtime::block_on(history.capture_text(&text)).map_err(|_| "Could not save clipboard text. Check storage.")
+                                    }
                                     Err(_) => Err("Clipboard text is not valid UTF-8."),
                                 },
                                 Err(message) => Err(message),

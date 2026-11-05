@@ -10,9 +10,31 @@ enum Contents {
 pub struct NativeClipboard {
     state: Arc<Mutex<Option<arboard::Clipboard>>>,
     pub operation: Arc<tauri::async_runtime::Mutex<()>>,
+    own_writes: super::OwnWrites,
+}
+
+fn note_write(writes: &super::OwnWrites, contents: &Contents) {
+    match contents {
+        Contents::Text(text) => writes.note_text(text),
+        Contents::Image(image) => {
+            let (Ok(width), Ok(height)) = (u32::try_from(image.width), u32::try_from(image.height))
+            else {
+                return;
+            };
+            writes.note_image(&crate::images::rgba_hash(
+                width,
+                height,
+                image.bytes.as_ref(),
+            ));
+        }
+    }
 }
 
 impl NativeClipboard {
+    pub fn own_writes(&self) -> super::OwnWrites {
+        self.own_writes.clone()
+    }
+
     pub async fn write_selection(
         &self,
         history: &crate::database::History,
@@ -41,7 +63,9 @@ impl NativeClipboard {
 
     async fn write_unlocked(&self, contents: Contents) -> Result<(), AppError> {
         let state = self.state.clone();
+        let own_writes = self.own_writes.clone();
         tauri::async_runtime::spawn_blocking(move || {
+            note_write(&own_writes, &contents);
             let mut clipboard = state.lock().map_err(|_| AppError {
                 code: "clipboard_error",
                 message: "Clipboard unavailable. Restart ClipboardX.".into(),

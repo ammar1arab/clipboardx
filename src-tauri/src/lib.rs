@@ -44,7 +44,9 @@ pub fn run() {
             app.manage(frame);
             #[cfg(target_os = "linux")]
             app.manage(platform::cosmic::FocusTracker::start()?);
-            app.manage(clipboard::writer::NativeClipboard::default());
+            let clipboard = clipboard::writer::NativeClipboard::default();
+            app.manage(clipboard.own_writes());
+            app.manage(clipboard);
             app.manage(clipboard::CaptureMonitor::start(app.handle().clone())?);
             #[cfg(not(target_os = "linux"))]
             {
@@ -65,12 +67,11 @@ pub fn run() {
             }
             Ok(())
         })
-        .on_window_event(|window, event| match event {
-            tauri::WindowEvent::CloseRequested { api, .. } => {
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let _ = window.hide();
             }
-            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             commands::list_history,

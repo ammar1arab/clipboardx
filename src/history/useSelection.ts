@@ -26,11 +26,19 @@ export function useSelection(ids: string[]) {
     }
   }
 
-  function move(delta: number, extend = false) {
+  function moveTo(index: number, extend = false) {
     if (!ids.length) return;
-    const next = ids[Math.max(0, Math.min(ids.length - 1, ids.indexOf(activeId!) + delta))];
+    const next = ids[Math.max(0, Math.min(ids.length - 1, index))];
     choose(next, false, extend);
   }
+  function move(delta: number, extend = false) {
+    if (!ids.length || !activeId) return;
+    moveTo(ids.indexOf(activeId) + delta, extend);
+  }
   function clear() { setSelection(new Set()); setAnchor(activeId); }
-  return { activeId, selected, move, choose, clear, activate: setActive, selectAll: () => setSelection(new Set(ids)) };
+  function selectAll() {
+    setSelection(new Set(ids));
+    if (ids[0]) { setActive(ids[0]); setAnchor(ids[0]); }
+  }
+  return { activeId, selected, move, moveTo, choose, clear, activate: setActive, selectAll };
 }

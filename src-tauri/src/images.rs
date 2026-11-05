@@ -24,6 +24,19 @@ fn failure() -> AppError {
     AppError::storage("Could not access clipboard image storage")
 }
 
+pub fn rgba_hash(width: u32, height: u32, raw: &[u8]) -> String {
+    let mut digest = Sha256::new();
+    digest.update(width.to_le_bytes());
+    digest.update(height.to_le_bytes());
+    digest.update(raw);
+    hex::encode(digest.finalize())
+}
+
+pub fn encoded_rgba_hash(bytes: &[u8]) -> Result<String, AppError> {
+    let image = decode(bytes)?.to_rgba8();
+    Ok(rgba_hash(image.width(), image.height(), image.as_raw()))
+}
+
 fn decode(bytes: &[u8]) -> Result<DynamicImage, AppError> {
     if bytes.is_empty() || bytes.len() > 64 * 1024 * 1024 {
         return Err("Clipboard image exceeds the 64 MiB limit".into());
@@ -118,11 +131,7 @@ impl ImageStore {
         let image = decode(bytes)?;
         let rgba = image.to_rgba8();
         let (width, height) = rgba.dimensions();
-        let mut digest = Sha256::new();
-        digest.update(width.to_le_bytes());
-        digest.update(height.to_le_bytes());
-        digest.update(rgba.as_raw());
-        let hash = hex::encode(digest.finalize());
+        let hash = rgba_hash(width, height, rgba.as_raw());
         let path = self.root.join(format!("{hash}.png"));
         let thumbnail = self.root.join(format!("{hash}-thumb.png"));
         self.save(&DynamicImage::ImageRgba8(rgba), &path)?;
@@ -184,6 +193,7 @@ mod tests {
         let first = store.store(bytes.get_ref()).unwrap();
         let second = store.store(bytes.get_ref()).unwrap();
         assert_eq!(first.hash, second.hash);
+        assert_eq!(first.hash, encoded_rgba_hash(bytes.get_ref()).unwrap());
         let thumbnail = image::open(&first.thumbnail).unwrap();
         assert!(thumbnail.width() <= 224 && thumbnail.height() <= 144);
         assert_eq!(store.read(&first.path).unwrap().width, 800);

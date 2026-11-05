@@ -1,27 +1,28 @@
 import { MoreVertical, Pin } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { formatClipAge, type ClipboardItem } from "../domain/clipboard";
 
 type Props = {
-  item: ClipboardItem; active: boolean; selected: boolean;
+  item: ClipboardItem; active: boolean; selected: boolean; fresh?: boolean;
   choose: (toggle: boolean, range: boolean) => void;
   paste: () => void; pin: () => void; edit: () => void; remove: () => void; activate: () => void;
 };
 
-export function HistoryItemRow({ item, active, selected, choose, paste, pin, edit, remove, activate }: Props) {
+export function HistoryItemRow({ item, active, selected, fresh, choose, paste, pin, edit, remove, activate }: Props) {
   const menuBox = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState(false);
-  useEffect(() => {
-    if (!menu) return;
-    const close = (event: PointerEvent) => { if (!menuBox.current?.contains(event.target as Node)) setMenu(false); };
+  function bindMenu(node: HTMLDivElement | null) {
+    menuBox.current = node;
+    if (!node || !menu) return;
+    const close = (event: PointerEvent) => { if (!node.contains(event.target as Node)) setMenu(false); };
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
-  }, [menu]);
+  }
   const dragged = useRef(false);
   const pick = (action: () => void) => () => { setMenu(false); action(); };
   const label = item.kind === "text" ? item.text : `Image, ${item.width} by ${item.height}`;
-  return <li ref={(node) => { if (active) node?.scrollIntoView?.({ block: "nearest" }); }} className={`history-item ${active ? "is-active" : ""} ${selected ? "is-selected" : ""}`}>
-    <div id={`entry-${item.id}`} className="item-content" role="button" tabIndex={0} aria-label={label} aria-pressed={selected}
+  return <li ref={(node) => { if (active) node?.scrollIntoView?.({ block: "nearest" }); }} aria-selected={selected} className={`history-item${active ? " is-active" : ""}${selected ? " is-selected" : ""}${fresh ? " is-new" : ""}`}>
+    <div id={`entry-${item.id}`} className="item-content" role="button" tabIndex={0} aria-label={label} aria-pressed={selected} aria-selected={selected}
       draggable
       onDragStart={(event) => {
         dragged.current = true;
@@ -36,7 +37,6 @@ export function HistoryItemRow({ item, active, selected, choose, paste, pin, edi
       }}
       onDragEnd={() => { window.setTimeout(() => { dragged.current = false; }, 0); }}
       onFocus={activate}
-      onKeyDown={(event) => { if (event.key === " ") { event.preventDefault(); event.currentTarget.click(); } }}
       onClick={(event) => {
         if (dragged.current) { event.preventDefault(); return; }
         choose(event.ctrlKey || event.metaKey, event.shiftKey);
@@ -50,7 +50,7 @@ export function HistoryItemRow({ item, active, selected, choose, paste, pin, edi
         {item.pinned && <span className="pin-label"><Pin size={10} aria-hidden="true" /> Pinned</span>}
       </span>
     </div>
-    <div ref={menuBox} className="item-menu" onKeyDown={(event) => {
+    <div ref={bindMenu} className="item-menu" onKeyDown={(event) => {
       if (event.key === "Escape" && menu) { event.stopPropagation(); setMenu(false); menuBox.current?.querySelector("button")?.focus(); }
     }}>
       <button className="icon-button" aria-label="More actions" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(!menu)}><MoreVertical size={14} /></button>

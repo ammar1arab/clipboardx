@@ -1,6 +1,9 @@
+mod own_writes;
 #[cfg(target_os = "linux")]
 mod wayland;
 pub mod writer;
+
+pub use own_writes::OwnWrites;
 
 use crate::error::AppError;
 use serde::Serialize;

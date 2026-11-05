@@ -16,13 +16,18 @@ Closing the window hides it and keeps capture running. **Quit ClipboardX** in Se
 | --- | --- |
 | Super+V | Open or close |
 | ↑ ↓ | Move |
-| Enter | Paste |
+| Shift+↑ ↓ | Extend the selection |
+| Home / End | Jump to an end |
+| Enter | Paste the selection, or the active entry |
 | Ctrl+Enter | Paste the selection |
 | Ctrl+A | Select visible entries |
 | Ctrl+Click / Shift+Click | Toggle one / select a range |
+| Space | Toggle the active entry |
 | Delete | Remove |
 | F2 | Edit text |
 | Ctrl+P | Pin or unpin |
+| Alt+1 / Alt+2 | Filter images / text |
+| Ctrl+/ | Show shortcuts |
 | Esc | Clear selection or search, then close |
 | Type | Search |
 | Drag | Drop the text or image into another app |

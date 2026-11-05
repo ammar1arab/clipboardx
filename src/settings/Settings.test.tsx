@@ -21,23 +21,27 @@ test("shows load errors with a working Retry instead of loading forever", async 
   expect(invoke.mock.calls.filter(([command]) => command === "get_settings")).toHaveLength(2);
 });
 
-test("loads real preferences, saves separator and requires confirmation before deleting pins", async () => {
-  invoke.mockImplementation(async (command) => command === "get_settings" ? { captureImages: true, pasteSeparator: " | ", windowWidth: 460, windowHeight: 520 } : command === "get_retention" ? { maxItems: 500, maxAgeDays: 30 } : undefined);
+test("loads real preferences, saves them, and clears all history immediately", async () => {
+  invoke.mockImplementation(async (command) => command === "get_settings" ? { captureImages: true, pasteSeparator: " | ", windowWidth: 460, windowHeight: 520, stageSelection: true, showShortcutBar: true } : command === "get_retention" ? { maxItems: 500, maxAgeDays: 30 } : undefined);
   isEnabled.mockResolvedValue(true);
   const user = userEvent.setup();
   render(<Settings close={vi.fn()} />);
   const separator = await screen.findByLabelText("Paste separator");
   expect(screen.getByLabelText("Start at login")).toBeChecked();
+  expect(screen.getByLabelText("Stage selection for Ctrl+V")).toBeChecked();
+  expect(screen.getByLabelText("Show shortcut bar")).toBeChecked();
+  expect(screen.getByLabelText("Separator style")).toHaveValue("custom");
+  await user.selectOptions(screen.getByLabelText("Separator style"), "line");
+  expect(separator).toHaveValue("\n");
   await user.clear(separator); await user.type(separator, ", ");
   await user.click(screen.getByRole("button", { name: "Save settings" }));
   expect(screen.getByLabelText("Width")).toHaveValue(460);
   expect(screen.getByLabelText("Height")).toHaveValue(520);
   expect(screen.queryByRole("button", { name: "On top" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Always show" })).not.toBeInTheDocument();
-  await waitFor(() => expect(invoke).toHaveBeenCalledWith("set_settings", { settings: { captureImages: true, pasteSeparator: ", ", windowWidth: 460, windowHeight: 520 } }));
+  expect(screen.queryByRole("button", { name: "Delete all" })).not.toBeInTheDocument();
+  await waitFor(() => expect(invoke).toHaveBeenCalledWith("set_settings", { settings: { captureImages: true, pasteSeparator: ", ", windowWidth: 460, windowHeight: 520, stageSelection: true, showShortcutBar: true } }));
   await user.click(screen.getByRole("button", { name: "Clear all history" }));
-  expect(invoke).not.toHaveBeenCalledWith("clear_history", { includePinned: true });
-  await user.click(screen.getByRole("button", { name: "Delete all" }));
   await waitFor(() => expect(invoke).toHaveBeenCalledWith("clear_history", { includePinned: true }));
   await user.click(screen.getByLabelText("Start at login"));
   await waitFor(() => expect(disable).toHaveBeenCalled());

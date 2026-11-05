@@ -11,11 +11,17 @@ impl WindowFrame {
     }
 
     pub fn get(&self) -> (u32, u32) {
-        *self.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+        *self
+            .0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     pub fn set(&self, width: u32, height: u32) {
-        *self.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = (width, height);
+        *self
+            .0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = (width, height);
     }
 }
 
@@ -114,4 +120,3 @@ pub async fn paste(
     }
     result
 }
-

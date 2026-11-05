@@ -210,7 +210,9 @@ impl FocusTracker {
         if self.requests.send(Request::FocusedTerminal(reply)).is_err() {
             return false;
         }
-        response.recv_timeout(Duration::from_millis(200)).unwrap_or(false)
+        response
+            .recv_timeout(Duration::from_millis(200))
+            .unwrap_or(false)
     }
 
     pub async fn restore(&self) -> Result<bool, AppError> {
