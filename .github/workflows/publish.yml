@@ -4,6 +4,10 @@
 # Mac: APPLE_CERTIFICATE (base64 p12), APPLE_CERTIFICATE_PASSWORD, APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
 name: Publish
 
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
   push:
@@ -52,12 +56,16 @@ jobs:
           targets: ${{ matrix.rust-targets }}
 
       - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          prefix-key: release-v1
+          cache-on-failure: "true"
 
       - name: Install Linux packages
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf mold
 
       - run: npm ci
 
@@ -102,8 +110,13 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
         shell: bash
         run: |
+          if [ "$(uname -s)" = Linux ]; then
+            mkdir -p src-tauri/.cargo
+            printf '%s\n' '[target.x86_64-unknown-linux-gnu]' 'rustflags = ["-C", "link-arg=-fuse-ld=mold"]' > src-tauri/.cargo/config.toml
+          fi
           [ -n "${APPLE_ID:-}" ] || unset APPLE_ID
           [ -n "${APPLE_PASSWORD:-}" ] || unset APPLE_PASSWORD
           [ -n "${APPLE_TEAM_ID:-}" ] || unset APPLE_TEAM_ID
