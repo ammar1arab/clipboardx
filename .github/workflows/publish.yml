@@ -140,6 +140,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish this installer
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
