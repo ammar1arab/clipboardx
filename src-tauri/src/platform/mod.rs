@@ -1,5 +1,7 @@
 #[cfg(target_os = "linux")]
 pub mod cosmic;
+#[cfg(target_os = "linux")]
+mod paste_keys;
 use crate::error::AppError;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -115,6 +117,43 @@ fn paste_chord(terminal: bool) -> &'static [&'static str] {
 }
 
 #[cfg(target_os = "linux")]
+fn send_paste(terminal: bool) -> Result<(), AppError> {
+    match paste_keys::send(terminal) {
+        Ok(()) => return Ok(()),
+        Err(paste_keys::SendError::Failed(message)) => {
+            return Err(AppError { code: "paste_error", message });
+        }
+        Err(paste_keys::SendError::Unavailable) => {}
+    }
+    use std::{
+        process::{Command, Stdio},
+        time::{Duration, Instant},
+    };
+    let error = || AppError {
+        code: "paste_error",
+        message: "Native paste failed. The item remains on the clipboard.".into(),
+    };
+    let mut process = Command::new("wtype")
+        .args(paste_chord(terminal))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|_| error())?;
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        match process.try_wait() {
+            Ok(Some(status)) => return if status.success() { Ok(()) } else { Err(error()) },
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(10)),
+            _ => {
+                let _ = process.kill();
+                let _ = process.wait();
+                return Err(error());
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
 fn window_away(window: &tauri::WebviewWindow) -> bool {
     !window.is_visible().unwrap_or(true) && !window.is_focused().unwrap_or(true)
 }
@@ -154,20 +193,9 @@ pub async fn paste(
                 message: "The previous app did not take the keyboard. The item remains on the clipboard.".into(),
             });
         }
-        let keys = paste_chord(terminal);
-        tauri::async_runtime::spawn_blocking(move || {
-            use std::{process::{Command, Stdio}, time::{Duration, Instant}};
-            let error = || AppError { code: "paste_error", message: "Native paste failed. Ensure wtype is installed and virtual-keyboard support is available. The item remains on the clipboard.".into() };
-            let mut process = Command::new("wtype").args(keys).stdout(Stdio::null()).stderr(Stdio::null()).spawn().map_err(|_| error())?;
-            let deadline = Instant::now() + Duration::from_secs(2);
-            loop {
-                match process.try_wait() {
-                    Ok(Some(status)) => return if status.success() { Ok(()) } else { Err(error()) },
-                    Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(10)),
-                    _ => { let _ = process.kill(); let _ = process.wait(); return Err(error()); }
-                }
-            }
-        }).await.map_err(|_| AppError::from("Native paste task stopped"))?
+        tauri::async_runtime::spawn_blocking(move || send_paste(terminal))
+            .await
+            .map_err(|_| AppError::from("Native paste task stopped"))?
     }.await;
     if result.is_err() {
         let _ = window.show();

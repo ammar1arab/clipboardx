@@ -40,6 +40,6 @@ tauri-plugin-global-shortcut = "2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 wl-clipboard-rs = "0.9.4"
-nix = { version = "0.31.3", features = ["poll"] }
+nix = { version = "0.31.3", features = ["ioctl", "poll"] }
 wayland-client = "0.31.15"
 cosmic-protocols = { version = "0.2.0", default-features = false, features = ["client"] }
