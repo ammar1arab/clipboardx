@@ -26,6 +26,8 @@ jobs:
   build:
     name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -136,6 +138,15 @@ jobs:
           name: installer-${{ matrix.name }}
           path: dist/${{ matrix.installer }}
           if-no-files-found: error
+
+      - name: Publish this installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view stable >/dev/null 2>&1; then
+            gh release create stable --latest --title "ClipboardX" --notes "Windows, Mac, and Linux downloads." || true
+          fi
+          gh release upload stable "dist/${{ matrix.installer }}" --clobber
 
   publish:
     name: Publish the download

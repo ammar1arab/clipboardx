@@ -58,11 +58,11 @@ mod tests {
     fn paste_chord_holds_ctrl_before_v() {
         let editor = paste_chord(false);
         let terminal = paste_chord(true);
-        assert_eq!(&editor[..6], &["-M", "ctrl", "-s", "40", "-k", "v"]);
+        assert_eq!(&editor[..6], &["-M", "ctrl", "-P", "v", "-s", "25"]);
         assert!(editor.ends_with(&["-m", "ctrl"]));
         assert!(terminal
             .windows(4)
-            .any(|part| part == ["-M", "shift", "-s", "40"]));
+            .any(|part| part == ["-M", "shift", "-P", "v"]));
         assert!(terminal.contains(&"-m") && terminal.contains(&"shift"));
     }
 
@@ -106,28 +106,35 @@ mod tests {
 fn paste_chord(terminal: bool) -> &'static [&'static str] {
     if terminal {
         &[
-            "-M", "ctrl", "-M", "shift", "-s", "40", "-k", "v", "-s", "20", "-m", "shift", "-m",
+            "-M", "ctrl", "-M", "shift", "-P", "v", "-s", "25", "-p", "v", "-m", "shift", "-m",
             "ctrl",
         ]
     } else {
-        &[
-            "-M", "ctrl", "-s", "40", "-k", "v", "-s", "20", "-m", "ctrl",
-        ]
+        &["-M", "ctrl", "-P", "v", "-s", "25", "-p", "v", "-m", "ctrl"]
     }
 }
 
 #[cfg(target_os = "linux")]
+fn window_away(window: &tauri::WebviewWindow) -> bool {
+    !window.is_visible().unwrap_or(true) && !window.is_focused().unwrap_or(true)
+}
+
+#[cfg(target_os = "linux")]
 async fn keyboard_left(window: &tauri::WebviewWindow) -> bool {
-    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(350);
-    loop {
-        if !window.is_focused().unwrap_or(false) {
-            return true;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(700);
+    let mut away_since = None;
+    while std::time::Instant::now() < deadline {
+        if window_away(window) {
+            let since = *away_since.get_or_insert_with(std::time::Instant::now);
+            if since.elapsed() >= std::time::Duration::from_millis(200) {
+                return true;
+            }
+        } else {
+            away_since = None;
         }
-        if std::time::Instant::now() >= deadline {
-            return false;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(15));
+        std::thread::sleep(std::time::Duration::from_millis(20));
     }
+    false
 }
 
 #[cfg(target_os = "linux")]
@@ -150,7 +157,6 @@ pub async fn paste(
         let keys = paste_chord(terminal);
         tauri::async_runtime::spawn_blocking(move || {
             use std::{process::{Command, Stdio}, time::{Duration, Instant}};
-            std::thread::sleep(Duration::from_millis(30));
             let error = || AppError { code: "paste_error", message: "Native paste failed. Ensure wtype is installed and virtual-keyboard support is available. The item remains on the clipboard.".into() };
             let mut process = Command::new("wtype").args(keys).stdout(Stdio::null()).stderr(Stdio::null()).spawn().map_err(|_| error())?;
             let deadline = Instant::now() + Duration::from_secs(2);

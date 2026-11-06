@@ -36,9 +36,10 @@ export function useSelection(ids: string[]) {
     moveTo(ids.indexOf(activeId) + delta, extend);
   }
   function clear() { setSelection(new Set()); setAnchor(activeId); }
+  function home() { setActive(null); setSelection(new Set()); setAnchor(null); }
   function selectAll() {
     setSelection(new Set(ids));
     if (ids[0]) { setActive(ids[0]); setAnchor(ids[0]); }
   }
-  return { activeId, selected, move, moveTo, choose, clear, activate: setActive, selectAll };
+  return { activeId, selected, move, moveTo, choose, clear, home, activate: setActive, selectAll };
 }

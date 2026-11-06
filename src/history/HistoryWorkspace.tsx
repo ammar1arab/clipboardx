@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { flushSync } from "react-dom";
 import { Clipboard, X, ArrowUpRight, Trash2, Settings, Image, Type, Keyboard } from "lucide-react";
 import { buildSearchIndex, searchItems, selectedItems, type ClipboardItem } from "../domain/clipboard";
@@ -34,7 +34,9 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const operationRunning = useRef(false);
   const search = useRef<HTMLInputElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
   const workspace = useRef<HTMLElement>(null);
+  const swallowUntil = useRef(0);
   const shortcutBox = useRef<HTMLDivElement>(null);
   const knownIds = useRef<Set<string> | null>(null);
   const deferredQuery = useDeferredValue(query);
@@ -73,6 +75,17 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
       setOperationError(typeof failure === "string" ? failure : "Could not copy the selection. Please try again.");
     });
   }
+  const openedAt = useRef<number | null>(null);
+  useEffect(() => {
+    const launch = launchCount ?? 0;
+    if (openedAt.current === launch) return;
+    openedAt.current = launch;
+    selection.home();
+    const node = scroller.current;
+    if (!node) return;
+    node.scrollTop = 0;
+    node.scrollTo?.({ top: 0 });
+  }, [launchCount, selection]);
   function bindWorkspace(node: HTMLElement | null) {
     workspace.current = node;
     if (!node) return;
@@ -102,9 +115,13 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
     const ids = selection.selected.size ? [...selection.selected] : active ? [active.id] : [];
     if (ids.length) void run(async () => { await actions.remove(ids); selection.clear(); });
   }
+  function pastedText(event: FormEvent) {
+    if (operationRunning.current || performance.now() < swallowUntil.current) event.preventDefault();
+  }
   function pasteEntries(entries: ClipboardItem[]) {
     if (!entries.length) return;
     if (mixed(entries)) return;
+    swallowUntil.current = performance.now() + 800;
     search.current?.blur();
     workspace.current?.focus();
     void run(() => actions.paste(entries));
@@ -121,14 +138,19 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
   }
   function onKeyDown(event: KeyboardEvent<HTMLElement>) {
     if (editing) return;
-    if ((busy || operationRunning.current) && (event.key.length === 1 || event.key === "Enter")) {
+    const modifier = event.ctrlKey || event.metaKey;
+    const leakedCharacter = !modifier && !event.altKey && event.key.length === 1;
+    if ((operationRunning.current || performance.now() < swallowUntil.current) && leakedCharacter) {
+      event.preventDefault();
+      return;
+    }
+    if ((busy || operationRunning.current) && event.key === "Enter") {
       event.preventDefault();
       return;
     }
     const target = event.target as HTMLElement;
     const inSearch = target === search.current;
     const inControl = Boolean(target.closest("button, input, textarea, select") && !inSearch && !target.closest(".item-content"));
-    const modifier = event.ctrlKey || event.metaKey;
     if (event.key === "Escape") {
       event.preventDefault();
       if (shortcutsOpen) { setShortcutsOpen(false); return; }
@@ -170,11 +192,15 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
   }
   const banner = operationError ?? error;
   const showRetry = !operationError && Boolean(error) && retry;
-  return <main ref={bindWorkspace} tabIndex={-1} className="workspace" onKeyDown={onKeyDown} aria-busy={busy || loading}>
+  return <main ref={bindWorkspace} tabIndex={-1} className="workspace" onKeyDown={onKeyDown} onBeforeInput={pastedText} aria-busy={busy || loading}>
     <header className="titlebar"><div className="searchbar">
       <input ref={search} aria-label="Search clipboard history" placeholder="Search your clipboard…" value={query}
         aria-controls="history-list" aria-activedescendant={selection.activeId ? `entry-${selection.activeId}` : undefined}
-        onChange={(event) => { setQuery(event.target.value); selection.clear(); }} />
+        onBeforeInput={pastedText}
+        onChange={(event) => {
+          if (operationRunning.current || performance.now() < swallowUntil.current) return;
+          setQuery(event.target.value); selection.clear();
+        }} />
       {query && <button className="icon-button" aria-label="Clear search" onClick={() => { setQuery(""); search.current?.focus(); }}><X size={14} /></button>}
     </div>
     <button className="icon-button" aria-label="Show images" aria-pressed={kind === "image"} onClick={() => toggleKind("image")}><Image size={15} /></button>
@@ -191,7 +217,7 @@ export function HistoryWorkspace({ items, actions, loading, error, retry, launch
       <button className="selection-action" disabled={busy} onClick={removeSelected}><Trash2 size={11} /> Delete</button>
       <button className="icon-button" aria-label="Clear selection" onClick={selection.clear}><X size={14} /></button>
     </div>}
-    <div className="history-scroll">
+    <div className="history-scroll" ref={scroller}>
       {loading ? <div className="empty-state" role="status">Loading clipboard history…</div> : visible.length === 0 ?
         <div className="empty-state"><Clipboard size={28} aria-hidden="true" /><strong>{query || kind ? "No matching entries" : "Your clipboard starts here"}</strong><span>{query || kind ? "Try another word or turn the filter off." : "Copy text or an image to keep it nearby."}</span></div> :
         <ul id="history-list" aria-label="Clipboard history" aria-multiselectable="true" className="history-list">

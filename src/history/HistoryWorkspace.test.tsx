@@ -70,6 +70,30 @@ describe("history interactions", () => {
     expect(dataTransfer.setData).toHaveBeenCalledWith("text/uri-list", "file:///tmp/synthetic.png");
   });
 
+  it("returns to the newest entry each time the window opens", async () => {
+    const actions = { stage: vi.fn(), paste: vi.fn(), remove: vi.fn(), pin: vi.fn(), edit: vi.fn(), dismiss: vi.fn() };
+    function Harness() {
+      const [launch, setLaunch] = useState(0);
+      return <>
+        <button onClick={() => setLaunch((current) => current + 1)}>Open again</button>
+        <HistoryWorkspace items={fixtures} actions={actions} launchCount={launch} />
+      </>;
+    }
+    render(<Harness />);
+    const user = userEvent.setup();
+    await user.keyboard("{End}");
+    expect(screen.getByRole("button", { name: "Image, 400 by 200" }).closest("li")).toHaveClass("is-active");
+    await user.click(screen.getByRole("button", { name: "Open again" }));
+    expect(screen.getByRole("button", { name: "Alpha source code" }).closest("li")).toHaveClass("is-active");
+  });
+
+  it("drops a leaked v instead of writing it into search", async () => {
+    const { user } = setup();
+    const search = screen.getByRole("textbox", { name: "Search clipboard history" });
+    await user.keyboard("{Enter}v");
+    expect(search).toHaveValue("");
+  });
+
   it("focuses the workspace, navigates with boundaries and pastes the active item", async () => {
     const { user, paste } = setup();
     expect(screen.getByRole("main")).toHaveFocus();
